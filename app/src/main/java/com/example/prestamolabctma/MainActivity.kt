@@ -4,44 +4,25 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import com.example.prestamolabctma.data.InMemoryPrestamoRepository
+import com.example.prestamolabctma.ui.navigation.PrestamoApp
 import com.example.prestamolabctma.ui.theme.PrestamoLabCTMATheme
+import com.example.prestamolabctma.ui.viewmodel.PrestamoViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Inicialización manual para el prototipo educativo
+        val repository = InMemoryPrestamoRepository()
+        val viewModel = PrestamoViewModel(repository)
+
         enableEdgeToEdge()
         setContent {
             PrestamoLabCTMATheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                // PrestamoApp integra el Scaffold, BottomBar, SnackbarHost y NavHost
+                PrestamoApp(viewModel = viewModel)
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    PrestamoLabCTMATheme {
-        Greeting("Android")
     }
 }
