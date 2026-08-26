@@ -1,0 +1,66 @@
+name: "Historia de Usuario (HU)"
+description: "Plantilla estructurada para registrar Historias de Usuario con criterios de aceptación y estimación."
+title: "HU-[X]: [Título de la Historia de Usuario]"
+labels: ["user-story"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 📖 Descripción de la Historia de Usuario
+        Utilice el formato estándar para definir el rol, la necesidad y el valor de negocio de la funcionalidad.
+
+  - type: textarea
+    id: user_story_format
+    attributes:
+      label: "Como / Quiero / Para"
+      placeholder: |
+        **Como:** [Rol del usuario, ej: Administrador de Laboratorio, Estudiante, Docente]
+        **Quiero:** [Acción o funcionalidad que se desea realizar]
+        **Para:** [Beneficio o valor de negocio que se obtiene]
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: "✅ Criterios de Aceptación (Escenario / Dado / Cuando / Entonces)"
+      placeholder: |
+        **Escenario 1:** [Nombre del escenario, ej: Solicitud exitosa]
+        - **Dado que** [Contexto inicial o precondición]
+        - **Cuando** [Acción ejecutada por el usuario o sistema]
+        - **Entonces** [Resultado esperado y comportamiento de la aplicación]
+        
+        **Escenario 2:** [Nombre del escenario, ej: Control de errores de validación]
+        - **Dado que** ...
+        - **Cuando** ...
+        - **Entonces** ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: story_points
+    attributes:
+      label: "🔢 Story Points (Estimación)"
+      description: "Seleccione el puntaje de esfuerzo estimado en base a la serie de Fibonacci."
+      options:
+        - "1"
+        - "2"
+        - "3"
+        - "5"
+        - "8"
+        - "13"
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical_notes
+    attributes:
+      label: "🛠️ Notas Técnicas y Tareas"
+      placeholder: |
+        - [ ] Diseñar UI con Jetpack Compose
+        - [ ] Implementar validaciones en ViewModel
+        - [ ] Escribir pruebas unitarias (Análisis de Valores Límite)
+        - [ ] Actualizar el Repositorio de Datos
+    validations:
+      required: false
