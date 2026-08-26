@@ -1,5 +1,7 @@
 # PrestamoLabCTMA 📱🧪
 
+![Android CI](https://github.com/YOUR_GITHUB_USER/PrestamoLabCTMA/actions/workflows/android-ci.yml/badge.svg)
+
 **PrestamoLabCTMA** es un prototipo educativo desarrollado en Android para la gestión de préstamos de equipos en los laboratorios del CTMA. La aplicación permite a los usuarios visualizar el catálogo de equipos disponibles, ver detalles técnicos y solicitar préstamos de manera rápida y sencilla.
 
 ## 🚀 Características
@@ -15,9 +17,10 @@
 *   **Lenguaje:** [Kotlin 2.0](https://kotlinlang.org/)
 *   **UI:** [Jetpack Compose](https://developer.android.com/jetpack/compose)
 *   **Navegación:** Compose Navigation
-*   **Arquitectura:** MVVM (Model-View-ViewModel) con StateFlow para la gestión de estado reactivo.
-*   **Componentes de UI:** Material 3 (Scaffold, BottomBar, TopAppBar, Cards, etc.).
-*   **Base de Datos:** Repositorio en memoria (`InMemoryPrestamoRepository`) para fines demostrativos.
+*   **Arquitectura:** MVVM (Model-View-ViewModel) con StateFlow.
+*   **Componentes de UI:** Material 3.
+*   **CI/CD:** [GitHub Actions](https://github.com/features/actions) para compilación automática y pruebas.
+*   **Base de Datos:** Repositorio en memoria (`InMemoryPrestamoRepository`).
 
 ## 📂 Estructura del Proyecto
 
@@ -26,14 +29,22 @@
 *   `ui/navigation/`: Configuración del NavHost y las rutas de la aplicación.
 *   `ui/screens/`: Pantallas individuales de la interfaz de usuario.
 *   `ui/viewmodel/`: Lógica de negocio y gestión del estado de la UI.
-*   `ui/theme/`: Configuración de colores, tipografía y formas de Material 3.
+*   `.github/workflows/`: Configuración de la integración continua (CI).
 
 ## ⚙️ Requisitos y Ejecución
 
 1.  Clonar el repositorio.
 2.  Abrir con **Android Studio Ladybug** o superior.
-3.  Asegurarse de tener instalado el SDK de Android 35 (Android 15).
+3.  Asegurarse de tener instalado el SDK de Android 35.
 4.  Sincronizar Gradle y ejecutar en un emulador o dispositivo físico (Min SDK 24).
+
+## 🤖 Integración Continua (CI)
+
+El proyecto incluye un flujo de trabajo de GitHub Actions (`android-ci.yml`) que automáticamente:
+1.  Compila el proyecto.
+2.  Ejecuta pruebas unitarias.
+3.  Realiza un análisis estático de código (Lint).
+4.  Genera el APK de depuración como artefacto de descarga.
 
 ---
 *Proyecto desarrollado con fines académicos para la gestión eficiente de recursos de laboratorio.*
