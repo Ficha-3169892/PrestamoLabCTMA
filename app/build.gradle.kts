@@ -33,6 +33,8 @@ android {
     }
     kotlinOptions {
         jvmTarget = "11"
+        // Aseguramos que el compilador de Kotlin sea estricto con los tipos de Compose
+        freeCompilerArgs += listOf("-P", "plugin:org.jetbrains.kotlin.compose:suppressKotlinVersionCompatibilityCheck=true")
     }
     buildFeatures {
         compose = true
