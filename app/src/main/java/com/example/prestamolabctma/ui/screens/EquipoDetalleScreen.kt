@@ -7,6 +7,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.prestamolabctma.model.Equipo
 import com.example.prestamolabctma.model.EstadoEquipo
@@ -20,7 +22,7 @@ fun EquipoDetalleScreen(
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text("Detalle de Equipo") },
+            title = { Text("Detalle de Herramienta") },
             navigationIcon = {
                 IconButton(onClick = onBackClick) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Regresar")
@@ -44,32 +46,81 @@ fun EquipoDetalleScreen(
                     elevation = CardDefaults.cardElevation(4.dp)
                 ) {
                     Column(modifier = Modifier.padding(24.dp)) {
-                        Text(text = equipo.nombre, style = MaterialTheme.typography.headlineMedium)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = "Categoría: ${equipo.categoria}", style = MaterialTheme.typography.bodyLarge)
+                        // HU 03: Ficha técnica detallada
+                        Text(text = equipo.nombre, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                        Text(text = "Placa: ${equipo.placa}", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.secondary)
+                        
+                        Divider(modifier = Modifier.padding(vertical = 12.dp))
+                        
+                        Text(text = "Categoría: ${equipo.categoria}", style = MaterialTheme.typography.bodyMedium)
+                        Text(text = "Ubicación: ${equipo.ubicacion}", style = MaterialTheme.typography.bodyMedium)
+                        
+                        if (equipo.observaciones.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(text = "Observaciones técnicas:", style = MaterialTheme.typography.labelLarge)
+                            Text(text = equipo.observaciones, style = MaterialTheme.typography.bodySmall)
+                        }
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         
-                        val isDisponible = equipo.estado == EstadoEquipo.DISPONIBLE
+                        // HU 03: Reglas de negocio (Disponibilidad y Reparación)
+                        val puedeSolicitar = equipo.estado == EstadoEquipo.DISPONIBLE
+                        val esReparacion = equipo.estado == EstadoEquipo.REPARACION || equipo.estado == EstadoEquipo.MANTENIMIENTO
                         
-                        Text(
-                            text = "Estado: ${equipo.estado}",
-                            color = if (isDisponible) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.titleMedium
-                        )
+                        StatusBadgeLarge(equipo.estado)
+
+                        if (equipo.estado == EstadoEquipo.PRESTADO) {
+                            Text(
+                                text = "Fecha estimada de devolución: Mañana 08:00 AM",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                        }
 
                         Spacer(modifier = Modifier.height(24.dp))
 
                         Button(
                             onClick = { onSolicitarClick(equipo.id) },
                             modifier = Modifier.fillMaxWidth(),
-                            enabled = isDisponible
+                            enabled = puedeSolicitar && !esReparacion,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (esReparacion) Color.Gray else MaterialTheme.colorScheme.primary
+                            )
                         ) {
-                            Text(if (isDisponible) "Solicitar Préstamo" else "No disponible")
+                            val btnText = when {
+                                esReparacion -> "En mantenimiento / Reparación"
+                                !puedeSolicitar -> "No disponible"
+                                else -> "Iniciar Solicitud de Préstamo"
+                            }
+                            Text(btnText)
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+fun StatusBadgeLarge(estado: EstadoEquipo) {
+    val color = when (estado) {
+        EstadoEquipo.DISPONIBLE -> Color(0xFF4CAF50)
+        EstadoEquipo.RESERVADO -> Color(0xFFFF9800)
+        EstadoEquipo.PRESTADO -> Color(0xFFF44336)
+        EstadoEquipo.MANTENIMIENTO, EstadoEquipo.REPARACION -> Color(0xFF9E9E9E)
+    }
+    Surface(
+        color = color.copy(alpha = 0.1f),
+        contentColor = color,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.padding(vertical = 8.dp)
+    ) {
+        Text(
+            text = "Estado: ${estado.name}",
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
