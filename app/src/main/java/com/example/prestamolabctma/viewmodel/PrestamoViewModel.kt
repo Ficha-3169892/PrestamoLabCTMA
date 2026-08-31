@@ -6,12 +6,14 @@ import com.example.prestamolabctma.data.repository.InMemoryPrestamoRepository
 import com.example.prestamolabctma.data.repository.PrestamoRepository
 import com.example.prestamolabctma.model.Equipo
 import com.example.prestamolabctma.model.EstadoEquipo
+import com.example.prestamolabctma.model.EstadoSolicitud
 import com.example.prestamolabctma.model.SolicitudPrestamo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
 
 data class PrestamoUiState(
     val equipos: List<Equipo> = emptyList(),
@@ -20,7 +22,6 @@ data class PrestamoUiState(
     val guardando: Boolean = false
 )
 
-// Funciones puras de validación
 fun propositoValido(texto: String): Boolean = texto.length in 10..180
 fun duracionValida(horas: Int): Boolean = horas in 1..8
 
@@ -50,7 +51,7 @@ class PrestamoViewModel(
         proposito: String,
         duracionHoras: Int
     ) {
-        if (_uiState.value.guardando) return // RN-05: Prevenir duplicidad por doble click
+        if (_uiState.value.guardando) return
 
         if (!propositoValido(proposito) || !duracionValida(duracionHoras) || ambienteDestino.isBlank()) {
             _uiState.update { it.copy(mensaje = "Datos de solicitud inválidos") }
@@ -58,7 +59,6 @@ class PrestamoViewModel(
         }
 
         val equipo = repository.obtenerEquipo(equipoId)
-        // RN-01: Validar que el equipo esté DISPONIBLE
         if (equipo == null || equipo.estado != EstadoEquipo.DISPONIBLE) {
             _uiState.update { it.copy(mensaje = "El equipo no está disponible para préstamo") }
             return
@@ -70,27 +70,23 @@ class PrestamoViewModel(
             val nuevaSolicitud = SolicitudPrestamo(
                 id = 0,
                 equipoId = equipoId,
+                usuarioId = "anonymous", // ID temporal para compatibilidad
                 ambienteDestino = ambienteDestino,
                 proposito = proposito,
+                fechaInicio = LocalDateTime.now(),
                 duracionHoras = duracionHoras,
-                estado = com.example.prestamolabctma.model.EstadoSolicitud.SOLICITADA
+                estado = EstadoSolicitud.SOLICITADA
             )
 
             val exito = repository.crearSolicitud(nuevaSolicitud)
             if (exito) {
                 _uiState.update { 
-                    it.copy(
-                        mensaje = "Solicitud creada con éxito",
-                        guardando = false
-                    )
+                    it.copy(mensaje = "Solicitud creada con éxito", guardando = false)
                 }
                 cargarDatos()
             } else {
                 _uiState.update { 
-                    it.copy(
-                        mensaje = "Error al crear la solicitud",
-                        guardando = false
-                    )
+                    it.copy(mensaje = "Error al crear la solicitud", guardando = false)
                 }
             }
         }
@@ -102,8 +98,6 @@ class PrestamoViewModel(
             if (exito) {
                 _uiState.update { it.copy(mensaje = "Solicitud cancelada") }
                 cargarDatos()
-            } else {
-                _uiState.update { it.copy(mensaje = "No se pudo cancelar la solicitud") }
             }
         }
     }

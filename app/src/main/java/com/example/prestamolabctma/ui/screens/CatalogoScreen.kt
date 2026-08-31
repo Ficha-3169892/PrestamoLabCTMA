@@ -39,7 +39,6 @@ fun CatalogoScreen(
             }
         )
 
-        // HU 02: SearchBar y Filtros
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             OutlinedTextField(
                 value = busqueda,
@@ -50,9 +49,9 @@ fun CatalogoScreen(
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium
             )
-
+            
             Spacer(modifier = Modifier.height(8.dp))
-
+            
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(vertical = 4.dp)
@@ -64,18 +63,19 @@ fun CatalogoScreen(
                         label = { Text("Todos") }
                     )
                 }
-                items(CategoriaEquipo.values()) { categoria ->
-                    FilterChip(
-                        selected = categoriaSeleccionada == categoria,
-                        onClick = { onCategoriaChange(categoria) },
-                        label = { Text(categoria.name) }
-                    )
+                CategoriaEquipo.values().forEach { categoria ->
+                    item {
+                        FilterChip(
+                            selected = categoriaSeleccionada == categoria,
+                            onClick = { onCategoriaChange(categoria) },
+                            label = { Text(categoria.name) }
+                        )
+                    }
                 }
             }
         }
 
         if (equipos.isEmpty()) {
-            // HU 02: Empty State
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("No se encontraron equipos", style = MaterialTheme.typography.bodyLarge)
             }
