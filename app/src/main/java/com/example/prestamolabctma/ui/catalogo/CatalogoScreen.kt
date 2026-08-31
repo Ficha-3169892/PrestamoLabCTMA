@@ -53,6 +53,8 @@ fun EquipoItem(equipo: Equipo, onClick: () -> Unit) {
                 EstadoEquipo.DISPONIBLE -> "Estado: DISPONIBLE" to Color(0xFF2E7D32)
                 EstadoEquipo.RESERVADO -> "Estado: RESERVADO" to Color(0xFFF57C00)
                 EstadoEquipo.PRESTADO -> "Estado: PRESTADO" to Color(0xFFD32F2F)
+                EstadoEquipo.MANTENIMIENTO -> "Estado: MANTENIMIENTO" to Color(0xFF757575)
+                EstadoEquipo.REPARACION -> "Estado: REPARACIÓN" to Color(0xFF5D4037)
             }
             
             Text(
