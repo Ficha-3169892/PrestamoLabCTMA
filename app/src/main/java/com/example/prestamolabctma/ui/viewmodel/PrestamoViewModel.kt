@@ -143,6 +143,12 @@ class PrestamoViewModel(private val repository: PrestamoRepository) : ViewModel(
                 esGrave = esGrave
             ))
         }
+
+        // HU-09: Reporte de falla grave inhabilita equipo
+        if (esGrave) {
+            repository.actualizarEstadoEquipo(solicitud.equipoId, EstadoEquipo.REPARACION)
+        }
+
         cargarDatos()
     }
 

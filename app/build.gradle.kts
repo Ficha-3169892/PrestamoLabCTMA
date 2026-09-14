@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.prestamolabctma"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -33,7 +33,6 @@ android {
     }
     kotlinOptions {
         jvmTarget = "11"
-        // Aseguramos que el compilador de Kotlin sea estricto con los tipos de Compose
         freeCompilerArgs += listOf("-P", "plugin:org.jetbrains.kotlin.compose:suppressKotlinVersionCompatibilityCheck=true")
     }
     buildFeatures {

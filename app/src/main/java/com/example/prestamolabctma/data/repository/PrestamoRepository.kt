@@ -5,7 +5,6 @@ import com.example.prestamolabctma.model.Equipo
 import com.example.prestamolabctma.model.EstadoEquipo
 import com.example.prestamolabctma.model.EstadoSolicitud
 import com.example.prestamolabctma.model.SolicitudPrestamo
-import java.time.LocalDateTime
 
 interface PrestamoRepository {
     fun obtenerEquipos(): List<Equipo>
