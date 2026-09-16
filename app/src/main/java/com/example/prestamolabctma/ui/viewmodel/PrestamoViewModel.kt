@@ -3,13 +3,27 @@ package com.example.prestamolabctma.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.prestamolabctma.data.repository.PrestamoRepository
-import com.example.prestamolabctma.domain.model.EstadoSolicitud
-import com.example.prestamolabctma.domain.model.SolicitudPrestamo
+import com.example.prestamolabctma.model.Equipo
+import com.example.prestamolabctma.model.EstadoSolicitud
+import com.example.prestamolabctma.model.SolicitudPrestamo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+data class PrestamoUiState(
+    val equipos: List<Equipo> = emptyList(),
+    val solicitudes: List<SolicitudPrestamo> = emptyList(),
+    val mensajeError: String? = null,
+    val guardando: Boolean = false
+)
+
+object PrestamoValidations {
+    fun ambienteValido(ambiente: String): Boolean = ambiente.isNotBlank()
+    fun propositoValido(proposito: String): Boolean = proposito.length in 10..180
+    fun duracionValida(horas: Int): Boolean = horas in 1..8
+}
 
 class PrestamoViewModel(
     private val repository: PrestamoRepository
@@ -23,12 +37,10 @@ class PrestamoViewModel(
     }
 
     fun cargarDatos() {
-        val equipos = repository.obtenerEquipos()
-        val solicitudes = repository.obtenerSolicitudes()
         _uiState.update { 
             it.copy(
-                equipos = equipos,
-                solicitudes = solicitudes,
+                equipos = repository.obtenerEquipos(),
+                solicitudes = repository.obtenerSolicitudes(),
                 mensajeError = null
             )
         }
@@ -41,18 +53,15 @@ class PrestamoViewModel(
         duracion: Int,
         onSuccess: () -> Unit
     ) {
-        // RN-05: Ignorar si ya se está guardando
         if (_uiState.value.guardando) return
 
-        // Bloquear ejecuciones dobles
         _uiState.update { it.copy(guardando = true, mensajeError = null) }
 
         viewModelScope.launch {
-            // Validaciones (RN-02, RN-03, RN-04)
             val error = when {
-                !PrestamoValidations.ambienteValido(ambiente) -> "El ambiente de destino no puede estar vacío (RN-02)"
-                !PrestamoValidations.propositoValido(proposito) -> "El propósito debe tener entre 10 y 180 caracteres (RN-03)"
-                !PrestamoValidations.duracionValida(duracion) -> "La duración debe ser entre 1 y 8 horas (RN-04)"
+                !PrestamoValidations.ambienteValido(ambiente) -> "El ambiente de destino no puede estar vacío"
+                !PrestamoValidations.propositoValido(proposito) -> "El propósito debe tener entre 10 y 180 caracteres"
+                !PrestamoValidations.duracionValida(duracion) -> "La duración debe ser entre 1 y 8 horas"
                 else -> null
             }
 
@@ -62,7 +71,7 @@ class PrestamoViewModel(
             }
 
             val nuevaSolicitud = SolicitudPrestamo(
-                id = 0, // El repo asignará el ID real
+                id = 0,
                 equipoId = equipoId,
                 ambienteDestino = ambiente,
                 proposito = proposito,
@@ -80,7 +89,7 @@ class PrestamoViewModel(
                 _uiState.update { 
                     it.copy(
                         guardando = false, 
-                        mensajeError = resultado.exceptionOrNull()?.message ?: "Error desconocido al crear solicitud"
+                        mensajeError = resultado.exceptionOrNull()?.message ?: "Error al crear la solicitud"
                     )
                 }
             }
@@ -98,5 +107,9 @@ class PrestamoViewModel(
                 }
             }
         }
+    }
+    
+    fun limpiarMensaje() {
+        _uiState.update { it.copy(mensajeError = null) }
     }
 }

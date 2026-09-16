@@ -1,54 +1,50 @@
-# PréstamoLab CTMA - Sistema de Gestión de Préstamos
+# PrestamoLabCTMA 📱🧪
 
-Aplicación Android moderna desarrollada con **Jetpack Compose** para la gestión y control de préstamos de equipos de laboratorio en el centro CTMA. El proyecto sigue una arquitectura limpia (Clean Architecture) y el patrón de flujo de datos unidireccional (UDF).
+![Android CI](https://github.com/YOUR_GITHUB_USER/PrestamoLabCTMA/actions/workflows/android-ci.yml/badge.svg)
 
-## 🚀 Características y Funcionalidades
+**PrestamoLabCTMA** es un prototipo educativo desarrollado en Android para la gestión de préstamos de equipos en los laboratorios del CTMA. La aplicación permite a los usuarios visualizar el catálogo de equipos disponibles, ver detalles técnicos y solicitar préstamos de manera rápida y sencilla.
 
-- **Catálogo de Equipos:** Visualización de inventario con estados en tiempo real.
-- **Gestión de Préstamos:** Formulario de solicitud con validaciones estrictas.
-- **Historial Personal:** Listado de "Mis Solicitudes" para seguimiento.
-- **Cancelación Segura:** Opción de cancelar solicitudes pendientes con restauración automática de stock.
-- **Accesibilidad:** Uso de badges con iconos y texto explícito para estados.
+## 🚀 Características
 
-## 🏗️ Arquitectura del Proyecto
+*   **Catálogo de Equipos:** Visualización completa de equipos categorizados (Electrónica, Herramientas, Cómputo, etc.) con sus estados en tiempo real (Disponible, Reservado, Prestado).
+*   **Detalle de Equipo:** Información detallada sobre cada dispositivo antes de realizar la solicitud.
+*   **Formulario de Solicitud:** Proceso simplificado para solicitar un equipo indicando el ambiente de destino, el propósito del uso y la duración estimada (1-8 horas).
+*   **Gestión de Solicitudes:** Sección de "Mis Préstamos" para realizar el seguimiento de las solicitudes y cancelarlas si es necesario.
+*   **Interfaz Moderna:** Construida totalmente con **Jetpack Compose** y siguiendo las guías de **Material Design 3**.
 
-La aplicación está dividida en capas para garantizar el desacoplamiento y la facilidad de pruebas:
+## 🛠️ Stack Tecnológico
 
-### 1. Capa de Dominio (`domain.model`)
-- Código Kotlin puro sin dependencias de Android.
-- **Modelos:** `Equipo`, `SolicitudPrestamo`.
-- **Enums:** Categorías de equipo, estados de equipo y estados de solicitud.
+*   **Lenguaje:** [Kotlin 2.0](https://kotlinlang.org/)
+*   **UI:** [Jetpack Compose](https://developer.android.com/jetpack/compose)
+*   **Navegación:** Compose Navigation
+*   **Arquitectura:** MVVM (Model-View-ViewModel) con StateFlow.
+*   **Componentes de UI:** Material 3.
+*   **CI/CD:** [GitHub Actions](https://github.com/features/actions) para compilación automática y pruebas.
+*   **Base de Datos:** Repositorio en memoria (`InMemoryPrestamoRepository`).
 
-### 2. Capa de Datos (`data.repository`)
-- **PrestamoRepository:** Interfaz que define el contrato de datos.
-- **InMemoryPrestamoRepository:** Implementación funcional mediante un **Singleton (`object`)** que persiste los datos durante la sesión de la app, manejando la lógica de actualización de estados de los equipos (RN-06).
+## 📂 Estructura del Proyecto
 
-### 3. Capa de Presentación (`ui`)
-- **ViewModel:** Gestión de estado mediante `StateFlow` y lógica de negocio.
-- **UDF (Unidirectional Data Flow):** El estado fluye hacia la UI y los eventos fluyen hacia el ViewModel.
-- **Navigation:** Grafo de navegación centralizado con paso seguro de argumentos (identificadores de tipo `Int`).
+*   `data/`: Contiene la lógica de acceso a datos y repositorios.
+*   `model/`: Definición de los modelos de datos (Equipo, Solicitud, Enums).
+*   `ui/navigation/`: Configuración del NavHost y las rutas de la aplicación.
+*   `ui/screens/`: Pantallas individuales de la interfaz de usuario.
+*   `ui/viewmodel/`: Lógica de negocio y gestión del estado de la UI.
+*   `.github/workflows/`: Configuración de la integración continua (CI).
 
-## 🛠️ Reglas de Negocio Implementadas (RN)
+## ⚙️ Requisitos y Ejecución
 
-| ID | Regla de Negocio | Implementación |
-|:---|:---|:---|
-| **RN-01** | Disponibilidad | Solo se pueden solicitar equipos en estado `DISPONIBLE`. |
-| **RN-02** | Ambiente Obligatorio | El campo ambiente de destino no puede estar vacío. |
-| **RN-03** | Longitud de Propósito | El propósito debe tener entre 10 y 180 caracteres. |
-| **RN-04** | Duración Máxima | El préstamo debe ser de entre 1 y 8 horas. |
-| **RN-05** | Prevención de Duplicados | Bloqueo de UI (`guardando = true`) durante el proceso de envío. |
-| **RN-06** | Reserva Automática | Al crear una solicitud, el equipo cambia automáticamente a `RESERVADO`. |
-| **RN-07** | Cancelación Restringida | Solo se pueden cancelar solicitudes en estado `SOLICITADA`. |
-| **RN-08** | Control de Errores | Manejo de IDs inexistentes en rutas mediante pantalla de error recuperable. |
-| **RN-09** | Privacidad | Uso de datos sintéticos y nombres genéricos de laboratorio. |
+1.  Clonar el repositorio.
+2.  Abrir con **Android Studio Ladybug** o superior.
+3.  Asegurarse de tener instalado el SDK de Android 35.
+4.  Sincronizar Gradle y ejecutar en un emulador o dispositivo físico (Min SDK 24).
 
-## 💻 Stack Tecnológico
+## 🤖 Integración Continua (CI)
 
-- **Lenguaje:** Kotlin 2.2.10
-- **UI:** Jetpack Compose con Material Design 3
-- **Navegación:** Compose Navigation
-- **Arquitectura:** ViewModel, StateFlow, Clean Architecture
-- **Inyección de Dependencias:** Manual mediante ViewModel Factory
+El proyecto incluye un flujo de trabajo de GitHub Actions (`android-ci.yml`) que automáticamente:
+1.  Compila el proyecto.
+2.  Ejecuta pruebas unitarias.
+3.  Realiza un análisis estático de código (Lint).
+4.  Genera el APK de depuración como artefacto de descarga.
 
 ---
-Desarrollado para el entorno de aprendizaje CTMA utilizando prácticas modernas de desarrollo Android.
+*Proyecto desarrollado con fines académicos para la gestión eficiente de recursos de laboratorio.*

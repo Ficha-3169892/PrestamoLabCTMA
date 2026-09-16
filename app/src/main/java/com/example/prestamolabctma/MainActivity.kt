@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Usamos el objeto Singleton directamente
+        // Usamos el objeto Singleton del repositorio consolidado
         val repository = InMemoryPrestamoRepository
         
         enableEdgeToEdge()
@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val viewModel: PrestamoViewModel = viewModel(
                         factory = object : ViewModelProvider.Factory {
+                            @Suppress("UNCHECKED_CAST")
                             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                                 return PrestamoViewModel(repository) as T
                             }

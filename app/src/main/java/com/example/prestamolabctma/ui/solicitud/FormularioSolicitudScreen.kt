@@ -27,7 +27,6 @@ fun FormularioSolicitudScreen(
     var proposito by remember { mutableStateOf("") }
     var duracionStr by remember { mutableStateOf("") }
 
-    // Validaciones en tiempo real para feedback visual
     val ambienteError = if (ambiente.isNotEmpty() && !PrestamoValidations.ambienteValido(ambiente)) "El ambiente no puede estar vacío" else null
     val propositoError = if (proposito.isNotEmpty() && !PrestamoValidations.propositoValido(proposito)) "Debe tener entre 10 y 180 caracteres" else null
     val duracionInt = duracionStr.toIntOrNull() ?: 0
@@ -61,7 +60,7 @@ fun FormularioSolicitudScreen(
             OutlinedTextField(
                 value = ambiente,
                 onValueChange = { ambiente = it },
-                label = { Text("Ambiente de Destino (Ej: Aula 302)") },
+                label = { Text("Ambiente de Destino") },
                 modifier = Modifier.fillMaxWidth(),
                 isError = ambienteError != null,
                 supportingText = { if (ambienteError != null) Text(ambienteError) }
@@ -91,8 +90,7 @@ fun FormularioSolicitudScreen(
                 Text(
                     text = uiState.mensajeError!!,
                     color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 8.dp)
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
 
@@ -114,11 +112,7 @@ fun FormularioSolicitudScreen(
                           ambienteError == null && propositoError == null && duracionError == null
             ) {
                 if (uiState.guardando) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
-                    )
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
                 } else {
                     Text("ENVIAR SOLICITUD")
                 }
