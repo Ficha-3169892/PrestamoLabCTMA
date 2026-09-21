@@ -1,6 +1,10 @@
 package com.example.prestamolabctma.data
 
 import com.example.prestamolabctma.model.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import java.io.File
+import java.io.InputStream
 import java.time.LocalDateTime
 
 interface PrestamoRepository {
@@ -15,13 +19,22 @@ interface PrestamoRepository {
 
     // Solicitudes
     fun obtenerSolicitudes(): List<SolicitudPrestamo>
+    fun obtenerSolicitudesFlow(): Flow<List<SolicitudPrestamo>>
     fun obtenerSolicitud(id: Int): SolicitudPrestamo?
     fun crearSolicitud(solicitud: SolicitudPrestamo)
     fun actualizarEstadoSolicitud(id: Int, nuevoEstado: EstadoSolicitud, motivo: String? = null)
     
+    // Remote
+    suspend fun refreshPrestamos(): Result<Unit>
+    
     // Novedades
     fun registrarNovedad(novedad: Novedad)
     fun obtenerNovedadesPorEquipo(equipoId: Int): List<Novedad>
+
+    // Semana 9: Evidencia fotográfica
+    suspend fun guardarEvidenciaLocal(inputStream: InputStream, fileName: String): Result<String>
+    suspend fun vincularEvidenciaASolicitud(solicitudId: Int, uri: String, mimeType: String, tamano: Long)
+    suspend fun subirEvidenciaAlServidor(solicitudId: Int): Result<Unit>
 }
 
 class InMemoryPrestamoRepository : PrestamoRepository {
@@ -41,6 +54,7 @@ class InMemoryPrestamoRepository : PrestamoRepository {
     )
 
     private val solicitudes = mutableListOf<SolicitudPrestamo>()
+    private val solicitudesFlow = MutableStateFlow<List<SolicitudPrestamo>>(emptyList())
     private val novedades = mutableListOf<Novedad>()
 
     override fun obtenerEquipos(): List<Equipo> = equipos.toList()
@@ -55,7 +69,6 @@ class InMemoryPrestamoRepository : PrestamoRepository {
     }
 
     override fun validarUsuario(identificador: String, contrasena: String): Usuario? {
-        // En un prototipo, cualquier contraseña es válida si el identificador coincide
         return usuarios.find { it.id == identificador || it.correo == identificador }
     }
 
@@ -63,10 +76,13 @@ class InMemoryPrestamoRepository : PrestamoRepository {
 
     override fun obtenerSolicitudes(): List<SolicitudPrestamo> = solicitudes.toList()
 
+    override fun obtenerSolicitudesFlow(): Flow<List<SolicitudPrestamo>> = solicitudesFlow
+
     override fun obtenerSolicitud(id: Int): SolicitudPrestamo? = solicitudes.find { it.id == id }
 
     override fun crearSolicitud(solicitud: SolicitudPrestamo) {
         solicitudes.add(solicitud)
+        solicitudesFlow.value = solicitudes.toList()
         if (solicitud.estado == EstadoSolicitud.APROBADA || solicitud.estado == EstadoSolicitud.SOLICITADA) {
             actualizarEstadoEquipo(solicitud.equipoId, EstadoEquipo.RESERVADO)
         }
@@ -77,8 +93,8 @@ class InMemoryPrestamoRepository : PrestamoRepository {
         if (index != -1) {
             val oldSol = solicitudes[index]
             solicitudes[index] = oldSol.copy(estado = nuevoEstado, motivoRechazo = motivo)
+            solicitudesFlow.value = solicitudes.toList()
             
-            // Lógica de actualización de inventario basada en el estado de la solicitud
             when (nuevoEstado) {
                 EstadoSolicitud.ENTREGADA -> actualizarEstadoEquipo(oldSol.equipoId, EstadoEquipo.PRESTADO)
                 EstadoSolicitud.DEVUELTA, EstadoSolicitud.CANCELADA, EstadoSolicitud.RECHAZADA -> 
@@ -87,6 +103,10 @@ class InMemoryPrestamoRepository : PrestamoRepository {
                 else -> {}
             }
         }
+    }
+
+    override suspend fun refreshPrestamos(): Result<Unit> {
+        return Result.success(Unit)
     }
 
     override fun registrarNovedad(novedad: Novedad) {
@@ -98,4 +118,37 @@ class InMemoryPrestamoRepository : PrestamoRepository {
 
     override fun obtenerNovedadesPorEquipo(equipoId: Int): List<Novedad> = 
         novedades.filter { it.equipoId == equipoId }
+
+    override suspend fun guardarEvidenciaLocal(inputStream: InputStream, fileName: String): Result<String> {
+        // Simulación: en una app real usaríamos context.filesDir
+        return Result.success("internal_storage/$fileName")
+    }
+
+    override suspend fun vincularEvidenciaASolicitud(solicitudId: Int, uri: String, mimeType: String, tamano: Long) {
+        val index = solicitudes.indexOfFirst { it.id == solicitudId }
+        if (index != -1) {
+            solicitudes[index] = solicitudes[index].copy(
+                evidenciaUri = uri,
+                evidenciaMimeType = mimeType,
+                evidenciaTamano = tamano,
+                evidenciaSyncEstado = EvidenciaSyncEstado.LOCAL
+            )
+            solicitudesFlow.value = solicitudes.toList()
+        }
+    }
+
+    override suspend fun subirEvidenciaAlServidor(solicitudId: Int): Result<Unit> {
+        val index = solicitudes.indexOfFirst { it.id == solicitudId }
+        if (index != -1) {
+            solicitudes[index] = solicitudes[index].copy(evidenciaSyncEstado = EvidenciaSyncEstado.SUBIENDO)
+            solicitudesFlow.value = solicitudes.toList()
+            
+            // Simular red
+            kotlinx.coroutines.delay(1000)
+            
+            solicitudes[index] = solicitudes[index].copy(evidenciaSyncEstado = EvidenciaSyncEstado.SINCRONIZADA)
+            solicitudesFlow.value = solicitudes.toList()
+        }
+        return Result.success(Unit)
+    }
 }

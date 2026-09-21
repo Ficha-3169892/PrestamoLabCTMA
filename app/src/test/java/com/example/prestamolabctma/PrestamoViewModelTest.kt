@@ -5,20 +5,36 @@ import com.example.prestamolabctma.model.*
 import com.example.prestamolabctma.ui.viewmodel.PrestamoViewModel
 import com.example.prestamolabctma.ui.viewmodel.duracionValida
 import com.example.prestamolabctma.ui.viewmodel.propositoValido
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import java.io.ByteArrayInputStream
 import java.time.LocalDateTime
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class PrestamoViewModelTest {
 
     private lateinit var viewModel: PrestamoViewModel
     private lateinit var repository: InMemoryPrestamoRepository
+    private val testDispatcher = UnconfinedTestDispatcher()
 
     @Before
     fun setup() {
+        Dispatchers.setMain(testDispatcher)
         repository = InMemoryPrestamoRepository()
         viewModel = PrestamoViewModel(repository)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
     }
 
     // --- PRUEBAS DE VALIDACIÓN (Básicas) ---
@@ -78,19 +94,8 @@ class PrestamoViewModelTest {
     }
 
     @Test
-    fun `HU-04 - Registro bloqueado por sanciones de usuario`() {
-        // Simulamos usuario con sanciones (esto se valida en el ViewModel)
-        val usuarioSancionado = Usuario("999", "Bad User", "bad@sena.edu.co", Role.APRENDIZ, tieneSanciones = true)
-        // Forzamos el estado para el test (en una app real vendría del repo)
-        // Nota: Para este test, inyectamos el usuario manualmente si el ViewModel lo permite o usamos el flujo de login
-        // Aquí usamos el login de un usuario que NO tiene sanciones en el repo por defecto, 
-        // pero podemos probar la lógica de bloqueo.
-    }
-
-    @Test
     fun `HU-06 - Cuentadante aprueba solicitud pendiente`() {
         viewModel.login("cuentadante", "admin")
-        // Crear solicitud previa
         repository.crearSolicitud(SolicitudPrestamo(1, 1, "123456", "Ambiente 1", "Proposito largo", LocalDateTime.now(), LocalDateTime.now(), 2, EstadoSolicitud.SOLICITADA))
         
         viewModel.procesarSolicitud(1, aprobado = true)
@@ -112,8 +117,7 @@ class PrestamoViewModelTest {
     fun `HU-08 - Solicitud de renovacion dentro de limites`() {
         repository.crearSolicitud(SolicitudPrestamo(1, 1, "123456", "Ambiente 1", "Proposito largo", LocalDateTime.now(), LocalDateTime.now(), 2, EstadoSolicitud.ENTREGADA))
         viewModel.solicitarExtension(1)
-        // La lógica de renovación actual es una simulación que recarga datos
-        assertNull(viewModel.uiState.value.mensaje) // No hay error
+        assertNull(viewModel.uiState.value.mensaje)
     }
 
     @Test
@@ -123,5 +127,63 @@ class PrestamoViewModelTest {
         
         viewModel.registrarDevolucion(1, novedades = "Pantalla rota", esGrave = true)
         assertEquals(EstadoEquipo.REPARACION, repository.obtenerEquipo(1)?.estado)
+    }
+
+    // --- SEMANA 09: PRUEBAS DE EVIDENCIA FOTOGRÁFICA ---
+
+    @Test
+    fun `Semana 09 - Adjuntar evidencia valida actualiza estado con URI local`() = runTest {
+        val content = "fake image content".toByteArray()
+        val inputStream = ByteArrayInputStream(content)
+        
+        viewModel.adjuntarEvidencia(inputStream, "test.jpg", "image/jpeg", content.size.toLong())
+        
+        val evidenceState = viewModel.uiState.value.evidenciaEstado
+        assertNotNull(evidenceState.uriPreview)
+        assertTrue(evidenceState.uriPreview!!.contains("test.jpg"))
+        assertEquals(EvidenciaSyncEstado.LOCAL, evidenceState.estadoSync)
+        assertNull(evidenceState.mensajeError)
+    }
+
+    @Test
+    fun `Semana 09 - Adjuntar evidencia de mas de 5MB reporta error`() = runTest {
+        val largeSize = 6 * 1024 * 1024L
+        val inputStream = ByteArrayInputStream(ByteArray(0))
+        
+        viewModel.adjuntarEvidencia(inputStream, "big.jpg", "image/jpeg", largeSize)
+        
+        val evidenceState = viewModel.uiState.value.evidenciaEstado
+        assertNull(evidenceState.uriPreview)
+        assertEquals("El archivo es demasiado grande (máx 5MB)", evidenceState.mensajeError)
+    }
+
+    @Test
+    fun `Semana 09 - Confirmar evidencia vincula a prestamo y cambia a sincronizada`() = runTest {
+        // 1. Crear solicitud
+        repository.crearSolicitud(SolicitudPrestamo(1, 1, "123456", "Amb 1", "Proposito largo", LocalDateTime.now(), LocalDateTime.now(), 2, EstadoSolicitud.SOLICITADA))
+        
+        // 2. Adjuntar localmente
+        val content = "image".toByteArray()
+        viewModel.adjuntarEvidencia(ByteArrayInputStream(content), "photo.jpg", "image/jpeg", content.size.toLong())
+        
+        // 3. Confirmar y subir
+        viewModel.confirmarYSubirEvidencia(1)
+        
+        // Con UnconfinedTestDispatcher y runTest, el delay virtual de 1s en InMemoryRepository pasa instantaneamente
+        val solicitud = repository.obtenerSolicitud(1)
+        assertNotNull(solicitud?.evidenciaUri)
+        assertEquals(EvidenciaSyncEstado.SINCRONIZADA, solicitud?.evidenciaSyncEstado)
+    }
+
+    @Test
+    fun `Semana 09 - Eliminar evidencia limpia el estado del ViewModel`() {
+        val content = "image".toByteArray()
+        viewModel.adjuntarEvidencia(ByteArrayInputStream(content), "photo.jpg", "image/jpeg", content.size.toLong())
+        
+        viewModel.eliminarEvidencia()
+        
+        val evidenceState = viewModel.uiState.value.evidenciaEstado
+        assertNull(evidenceState.uriPreview)
+        assertNull(evidenceState.estadoSync)
     }
 }

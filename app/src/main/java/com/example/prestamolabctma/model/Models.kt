@@ -27,6 +27,10 @@ enum class EstadoSolicitud {
     SOLICITADA, APROBADA, ENTREGADA, DEVUELTA, CANCELADA, RECHAZADA, EN_REVISION
 }
 
+enum class EvidenciaSyncEstado {
+    LOCAL, SUBIENDO, SINCRONIZADA, FALLIDA
+}
+
 data class Equipo(
     val id: Int,
     val placa: String,
@@ -50,7 +54,12 @@ data class SolicitudPrestamo(
     val estado: EstadoSolicitud,
     val motivoRechazo: String? = null,
     val novedadDevolucion: String? = null,
-    val renovaciones: Int = 0
+    val renovaciones: Int = 0,
+    // Semana 9: Evidencia fotográfica
+    val evidenciaUri: String? = null,
+    val evidenciaMimeType: String? = null,
+    val evidenciaTamano: Long? = null,
+    val evidenciaSyncEstado: EvidenciaSyncEstado? = null
 )
 
 data class Novedad(

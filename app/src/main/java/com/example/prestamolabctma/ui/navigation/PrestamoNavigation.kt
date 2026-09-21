@@ -34,6 +34,9 @@ sealed class Screen(val route: String, val label: String = "") {
         fun createRoute(equipoId: Int) = "solicitar/$equipoId"
     }
     data object MisSolicitudes : Screen("mis_solicitudes", "Mis Préstamos")
+    data object ReportarFalla : Screen("reportar_falla/{solicitudId}") {
+        fun createRoute(solicitudId: Int) = "reportar_falla/$solicitudId"
+    }
     data object Admin : Screen("admin", "Gestión")
     data object Historial : Screen("historial", "Historial")
 }
@@ -60,7 +63,6 @@ fun PrestamoApp(viewModel: PrestamoViewModel) {
 
             if (usuario != null && currentDestination?.route != Screen.Login.route) {
                 NavigationBar {
-                    // Item Catálogo
                     NavigationBarItem(
                         icon = { Icon(Icons.Default.Home, null) },
                         label = { Text(Screen.Catalogo.label) },
@@ -68,7 +70,6 @@ fun PrestamoApp(viewModel: PrestamoViewModel) {
                         onClick = { navigateBottom(navController, Screen.Catalogo.route) }
                     )
                     
-                    // Item Mis Préstamos (Solo Aprendiz/Instructor)
                     if (usuario.rol == Role.APRENDIZ || usuario.rol == Role.INSTRUCTOR) {
                         NavigationBarItem(
                             icon = { Icon(Icons.AutoMirrored.Filled.List, null) },
@@ -78,7 +79,6 @@ fun PrestamoApp(viewModel: PrestamoViewModel) {
                         )
                     }
 
-                    // Item Gestión (Solo Admin/Cuentadante) - HU 06
                     if (usuario.rol == Role.ADMIN || usuario.rol == Role.CUENTADANTE) {
                         NavigationBarItem(
                             icon = { Icon(Icons.Default.Settings, null) },
@@ -88,7 +88,6 @@ fun PrestamoApp(viewModel: PrestamoViewModel) {
                         )
                     }
 
-                    // Item Historial (Solo Admin/Instructor) - HU 10
                     if (usuario.rol == Role.ADMIN || usuario.rol == Role.INSTRUCTOR) {
                         NavigationBarItem(
                             icon = { Icon(Icons.Default.Person, null) },
@@ -203,8 +202,22 @@ fun PrestamoNavHost(
                 solicitudes = uiState.solicitudes.filter { it.usuarioId == uiState.usuarioLogueado?.id },
                 onCancelarClick = { viewModel.procesarSolicitud(it, false, "Cancelada por usuario") },
                 onExtenderClick = { viewModel.solicitarExtension(it) },
-                onReportarFalla = { /* HU 09 */ viewModel.registrarDevolucion(it, "Falla reportada por usuario", true) },
+                onReportarFalla = { solicitudId -> 
+                    navController.navigate(Screen.ReportarFalla.createRoute(solicitudId))
+                },
                 onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Screen.ReportarFalla.route,
+            arguments = listOf(navArgument("solicitudId") { type = NavType.IntType })
+        ) { backStackEntry ->
+            val solicitudId = backStackEntry.arguments?.getInt("solicitudId") ?: -1
+            ReportarFallaScreen(
+                solicitudId = solicitudId,
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
@@ -218,7 +231,6 @@ fun PrestamoNavHost(
         }
         
         composable(Screen.Historial.route) {
-            // HU 10: Historial simplificado
             HistorialScreen(
                 solicitudes = uiState.solicitudes,
                 onBackClick = { navController.popBackStack() }
