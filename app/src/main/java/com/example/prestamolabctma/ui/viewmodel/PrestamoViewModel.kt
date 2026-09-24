@@ -3,18 +3,32 @@ package com.example.prestamolabctma.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.prestamolabctma.data.PrestamoRepository
+import com.example.prestamolabctma.data.datastore.UserPreferencesRepository
 import com.example.prestamolabctma.model.*
+import com.example.prestamolabctma.util.LocationHelper
+import com.example.prestamolabctma.util.NotificationHelper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.time.LocalDateTime
-import kotlinx.coroutines.CancellationException
 import java.io.InputStream
+import java.time.LocalDateTime
 
 sealed class RefreshState {
     object Inactiva : RefreshState()
     object EnCurso : RefreshState()
     object Exitosa : RefreshState()
     data class Fallida(val error: String) : RefreshState()
+}
+
+/**
+ * Estados explícitos de la interfaz (Loading, Content, Empty, Error, Operation)
+ */
+sealed class UiStatus {
+    object Loading : UiStatus()
+    data class Content(val totalItems: Int) : UiStatus()
+    object Empty : UiStatus()
+    data class Error(val mensaje: String) : UiStatus()
+    data class Operation(val descripcion: String) : UiStatus()
 }
 
 /**
@@ -36,13 +50,18 @@ data class PrestamoUiState(
     val filtroCategoria: CategoriaEquipo? = null,
     val filtroBusqueda: String = "",
     val lastUpdated: Long? = null,
-    val evidenciaEstado: EvidenciaUiState = EvidenciaUiState()
+    val evidenciaEstado: EvidenciaUiState = EvidenciaUiState(),
+    val status: UiStatus = UiStatus.Loading,
+    val ultimaUbicacionRegistrada: String? = null
 )
 
 fun propositoValido(texto: String) = texto.length in 10..180
 fun duracionValida(horas: Int) = horas in 1..8
 
-class PrestamoViewModel(private val repository: PrestamoRepository) : ViewModel() {
+class PrestamoViewModel(
+    private val repository: PrestamoRepository,
+    private val userPreferencesRepository: UserPreferencesRepository? = null
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PrestamoUiState())
     val uiState: StateFlow<PrestamoUiState> = _uiState.asStateFlow()
@@ -51,16 +70,48 @@ class PrestamoViewModel(private val repository: PrestamoRepository) : ViewModel(
     val refreshState: StateFlow<RefreshState> = _refreshState.asStateFlow()
 
     init {
+        // Colectar solicitudes reactivamente
         viewModelScope.launch {
             repository.obtenerSolicitudesFlow().collect { lista ->
-                _uiState.update { it.copy(solicitudes = lista, lastUpdated = System.currentTimeMillis()) }
+                _uiState.update { current ->
+                    val newStatus = if (lista.isEmpty() && current.equipos.isEmpty()) UiStatus.Empty else UiStatus.Content(lista.size)
+                    current.copy(solicitudes = lista, lastUpdated = System.currentTimeMillis(), status = newStatus)
+                }
             }
         }
+
+        // Colectar catálogo de equipos reactivamente
+        viewModelScope.launch {
+            repository.obtenerEquiposFlow().collect { equipos ->
+                _uiState.update { current ->
+                    val newStatus = if (equipos.isEmpty() && current.solicitudes.isEmpty()) UiStatus.Empty else UiStatus.Content(equipos.size)
+                    current.copy(equipos = equipos, status = newStatus)
+                }
+            }
+        }
+
+        // Colectar preferencias de usuario si DataStore está presente
+        userPreferencesRepository?.let { prefsRepo ->
+            viewModelScope.launch {
+                prefsRepo.userPreferencesFlow.collect { prefs ->
+                    val catEnum = prefs.categoriaFiltro?.let {
+                        try { CategoriaEquipo.valueOf(it) } catch (e: Exception) { null }
+                    }
+                    _uiState.update { it.copy(filtroBusqueda = prefs.busquedaFiltro, filtroCategoria = catEnum) }
+                }
+            }
+        }
+
         cargarEquipos()
     }
 
-    private fun cargarEquipos() {
-        _uiState.update { it.copy(equipos = repository.obtenerEquipos()) }
+    fun cargarEquipos() {
+        viewModelScope.launch {
+            val lista = repository.obtenerEquipos()
+            if (lista.isNotEmpty()) {
+                _uiState.update { it.copy(equipos = lista, status = UiStatus.Content(lista.size)) }
+            }
+        }
     }
 
     fun refresh() {
@@ -69,8 +120,12 @@ class PrestamoViewModel(private val repository: PrestamoRepository) : ViewModel(
             try {
                 val result = repository.refreshPrestamos()
                 result.fold(
-                    onSuccess = { _refreshState.value = RefreshState.Exitosa },
-                    onFailure = { _refreshState.value = RefreshState.Fallida(it.message ?: "Error") }
+                    onSuccess = {
+                        _refreshState.value = RefreshState.Exitosa
+                    },
+                    onFailure = {
+                        _refreshState.value = RefreshState.Fallida(it.message ?: "Error")
+                    }
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -82,9 +137,6 @@ class PrestamoViewModel(private val repository: PrestamoRepository) : ViewModel(
 
     // --- GESTIÓN DE EVIDENCIA (Semana 9) ---
 
-    /**
-     * Procesa la imagen seleccionada o capturada, validando tamaño y persistiendo localmente.
-     */
     fun adjuntarEvidencia(inputStream: InputStream, fileName: String, mimeType: String, size: Long) {
         val MAX_SIZE = 5 * 1024 * 1024 // 5MB
         
@@ -114,25 +166,24 @@ class PrestamoViewModel(private val repository: PrestamoRepository) : ViewModel(
         }
     }
 
-    /**
-     * Vincula la evidencia actual a una solicitud de préstamo y dispara la sincronización.
-     */
     fun confirmarYSubirEvidencia(solicitudId: Int) {
         val estadoActual = _uiState.value.evidenciaEstado
         val uri = estadoActual.uriPreview ?: return
 
         viewModelScope.launch {
+            _uiState.update { it.copy(status = UiStatus.Operation("Subiendo evidencia fotográfica")) }
             repository.vincularEvidenciaASolicitud(
                 solicitudId, 
                 uri, 
                 mimeType = "image/jpeg", 
-                tamano = 0 // En una app real pasaríamos el tamaño real
+                tamano = 0
             )
             
             val result = repository.subirEvidenciaAlServidor(solicitudId)
-            result.onFailure { error ->
-                _uiState.update { it.copy(mensaje = "Sincronización fallida. Se reintentará luego.") }
+            result.onFailure {
+                _uiState.update { current -> current.copy(mensaje = "Sincronización fallida. Se reintentará luego.") }
             }
+            _uiState.update { current -> current.copy(status = UiStatus.Content(current.solicitudes.size)) }
         }
     }
 
@@ -140,20 +191,92 @@ class PrestamoViewModel(private val repository: PrestamoRepository) : ViewModel(
         _uiState.update { it.copy(evidenciaEstado = EvidenciaUiState()) }
     }
 
-    // --- LÓGICA DE NEGOCIO EXISTENTE (RESTAURADA) ---
+    // --- GESTIÓN DE UBICACIÓN GPS Y NOTIFICACIONES (Semana 9) ---
+
+    fun registrarDevolucionConUbicacion(
+        solicitudId: Int,
+        novedades: String?,
+        esGrave: Boolean,
+        locationHelper: LocationHelper
+    ) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(status = UiStatus.Operation("Obteniendo ubicación GPS para confirmación")) }
+            
+            var lat: Double? = null
+            var lng: Double? = null
+            var ts: Long? = null
+
+            val locResult = locationHelper.obtenerUbicacionPuntual()
+            locResult.onSuccess { ubicacion ->
+                lat = ubicacion.latitud
+                lng = ubicacion.longitud
+                ts = ubicacion.timestamp
+                _uiState.update { current ->
+                    current.copy(ultimaUbicacionRegistrada = "Lat: ${ubicacion.latitud}, Lng: ${ubicacion.longitud}")
+                }
+            }.onFailure {
+                _uiState.update { current ->
+                    current.copy(mensaje = "Devolución registrada sin GPS (No disponible o permiso denegado)")
+                }
+            }
+
+            val solicitud = repository.obtenerSolicitud(solicitudId)
+            if (solicitud != null) {
+                val solicitudConUbicacion = solicitud.copy(
+                    latitud = lat,
+                    longitud = lng,
+                    ubicacionTimestamp = ts
+                )
+                repository.crearSolicitud(solicitudConUbicacion)
+            }
+
+            val estadoFinal = if (esGrave) EstadoSolicitud.EN_REVISION else EstadoSolicitud.DEVUELTA
+            repository.actualizarEstadoSolicitud(solicitudId, estadoFinal, novedades)
+            if (esGrave && solicitud != null) {
+                repository.actualizarEstadoEquipo(solicitud.equipoId, EstadoEquipo.REPARACION)
+            }
+            cargarEquipos()
+            _uiState.update { current -> current.copy(status = UiStatus.Content(current.solicitudes.size)) }
+        }
+    }
+
+    fun activarRecordatorioNotificacion(solicitudId: Int, notificationHelper: NotificationHelper) {
+        viewModelScope.launch {
+            val solicitud = repository.obtenerSolicitud(solicitudId) ?: return@launch
+            val equipo = repository.obtenerEquipo(solicitud.equipoId)
+            val equipoNombre = equipo?.nombre ?: "Equipo de Laboratorio"
+
+            val enviado = notificationHelper.mostrarRecordatorioDevolucion(
+                solicitudId = solicitudId,
+                equipoNombre = equipoNombre,
+                ambiente = solicitud.ambienteDestino
+            )
+
+            if (enviado) {
+                _uiState.update { it.copy(mensaje = "Recordatorio de devolución activado correctamente") }
+            } else {
+                _uiState.update { it.copy(mensaje = "No se enviaron notificaciones (permiso denegado)") }
+            }
+        }
+    }
+
+    // --- LÓGICA DE NEGOCIO Y AUTENTICACIÓN ---
 
     fun login(identificador: String, contrasena: String): Boolean {
         if (identificador.isBlank() || contrasena.isBlank()) {
-            _uiState.update { it.copy(mensaje = "Documento o contraseña incorrectos") }
+            _uiState.update { it.copy(mensaje = "Documento o contraseña incorrectos", status = UiStatus.Error("Credenciales vacías")) }
             return false
         }
         val usuario = repository.validarUsuario(identificador, contrasena)
         if (usuario != null) {
-            _uiState.update { it.copy(usuarioLogueado = usuario, mensaje = "Bienvenido ${usuario.nombre}") }
+            _uiState.update { it.copy(usuarioLogueado = usuario, mensaje = "Bienvenido ${usuario.nombre}", status = UiStatus.Content(it.solicitudes.size)) }
+            userPreferencesRepository?.let { prefs ->
+                viewModelScope.launch { prefs.guardarUltimoRolUsado(usuario.rol.name) }
+            }
             refresh()
             return true
         } else {
-            _uiState.update { it.copy(mensaje = "Documento o contraseña incorrectos") }
+            _uiState.update { it.copy(mensaje = "Documento o contraseña incorrectos", status = UiStatus.Error("Credenciales inválidas")) }
             return false
         }
     }
@@ -169,7 +292,7 @@ class PrestamoViewModel(private val repository: PrestamoRepository) : ViewModel(
             return
         }
         
-        _uiState.update { it.copy(guardando = true) }
+        _uiState.update { it.copy(guardando = true, status = UiStatus.Operation("Guardando solicitud")) }
         val id = (_uiState.value.solicitudes.maxOfOrNull { it.id } ?: 0) + 1
         val sol = SolicitudPrestamo(
             id = id, equipoId = equipoId, usuarioId = usuario.id,
@@ -178,7 +301,7 @@ class PrestamoViewModel(private val repository: PrestamoRepository) : ViewModel(
             duracionHoras = horas, estado = EstadoSolicitud.SOLICITADA
         )
         repository.crearSolicitud(sol)
-        _uiState.update { it.copy(guardando = false, mensaje = "Solicitud enviada (Código: RES-$id)") }
+        _uiState.update { current -> current.copy(guardando = false, mensaje = "Solicitud enviada (Código: RES-$id)", status = UiStatus.Content(current.solicitudes.size + 1)) }
     }
 
     fun procesarSolicitud(solicitudId: Int, aprobado: Boolean, motivo: String? = null) {
@@ -188,24 +311,40 @@ class PrestamoViewModel(private val repository: PrestamoRepository) : ViewModel(
     }
 
     fun registrarDevolucion(solicitudId: Int, novedades: String?, esGrave: Boolean) {
-        val solicitud = repository.obtenerSolicitud(solicitudId) ?: return
-        val estadoFinal = if (esGrave) EstadoSolicitud.EN_REVISION else EstadoSolicitud.DEVUELTA
-        repository.actualizarEstadoSolicitud(solicitudId, estadoFinal)
-        if (esGrave) repository.actualizarEstadoEquipo(solicitud.equipoId, EstadoEquipo.REPARACION)
-        cargarEquipos()
+        viewModelScope.launch {
+            val solicitud = repository.obtenerSolicitud(solicitudId) ?: return@launch
+            val estadoFinal = if (esGrave) EstadoSolicitud.EN_REVISION else EstadoSolicitud.DEVUELTA
+            repository.actualizarEstadoSolicitud(solicitudId, estadoFinal, novedades)
+            if (esGrave) repository.actualizarEstadoEquipo(solicitud.equipoId, EstadoEquipo.REPARACION)
+            cargarEquipos()
+        }
     }
 
     fun solicitarExtension(solicitudId: Int) {
-        val solicitud = repository.obtenerSolicitud(solicitudId) ?: return
-        if (solicitud.renovaciones >= 1) {
-            _uiState.update { it.copy(mensaje = "Máximo 1 renovación permitida") }
-            return
+        viewModelScope.launch {
+            val solicitud = repository.obtenerSolicitud(solicitudId) ?: return@launch
+            if (solicitud.renovaciones >= 1) {
+                _uiState.update { it.copy(mensaje = "Máximo 1 renovación permitida") }
+                return@launch
+            }
+            cargarEquipos()
         }
-        cargarEquipos()
     }
 
-    fun setFiltroCategoria(categoria: CategoriaEquipo?) { _uiState.update { it.copy(filtroCategoria = categoria) } }
-    fun setFiltroBusqueda(texto: String) { _uiState.update { it.copy(filtroBusqueda = texto) } }
+    fun setFiltroCategoria(categoria: CategoriaEquipo?) {
+        _uiState.update { it.copy(filtroCategoria = categoria) }
+        userPreferencesRepository?.let { prefs ->
+            viewModelScope.launch { prefs.guardarCategoriaFiltro(categoria?.name) }
+        }
+    }
+
+    fun setFiltroBusqueda(texto: String) {
+        _uiState.update { it.copy(filtroBusqueda = texto) }
+        userPreferencesRepository?.let { prefs ->
+            viewModelScope.launch { prefs.guardarBusquedaFiltro(texto) }
+        }
+    }
+
     fun obtenerEquiposFiltrados(): List<Equipo> {
         val state = _uiState.value
         return state.equipos.filter { 

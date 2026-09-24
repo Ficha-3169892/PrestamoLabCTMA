@@ -87,6 +87,15 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
+    // DataStore
+    implementation("androidx.datastore:datastore-preferences:1.1.2")
+
+    // Location (FusedLocationProviderClient)
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+
+    // Lifecycle Compose (collectAsStateWithLifecycle)
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+
     // Coil (Imagen de evidencia)
     implementation(libs.coil.compose)
 

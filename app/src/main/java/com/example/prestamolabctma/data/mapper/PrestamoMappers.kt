@@ -1,14 +1,50 @@
 package com.example.prestamolabctma.data.mapper
 
+import com.example.prestamolabctma.data.local.EquipoEntity
 import com.example.prestamolabctma.data.local.PrestamoEntity
 import com.example.prestamolabctma.data.remote.PrestamoDto
+import com.example.prestamolabctma.model.Equipo
 import com.example.prestamolabctma.model.EstadoSolicitud
 import com.example.prestamolabctma.model.EvidenciaSyncEstado
 import com.example.prestamolabctma.model.SolicitudPrestamo
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 private val formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
+
+private fun parseDateSafely(dateStr: String?): LocalDateTime {
+    if (dateStr.isNullOrBlank()) return LocalDateTime.now()
+    return try {
+        LocalDateTime.parse(dateStr, formatter)
+    } catch (e: Exception) {
+        try {
+            LocalDateTime.parse(dateStr)
+        } catch (e2: Exception) {
+            try {
+                ZonedDateTime.parse(dateStr).toLocalDateTime()
+            } catch (e3: Exception) {
+                try {
+                    val pattern1 = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                    LocalDateTime.parse(dateStr, pattern1)
+                } catch (e4: Exception) {
+                    try {
+                        val pattern2 = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+                        LocalDateTime.parse(dateStr, pattern2)
+                    } catch (e5: Exception) {
+                        try {
+                            val pattern3 = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+                            LocalDate.parse(dateStr, pattern3).atStartOfDay()
+                        } catch (e6: Exception) {
+                            LocalDateTime.now()
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 fun PrestamoDto.toEntity(): PrestamoEntity {
     return PrestamoEntity(
@@ -24,10 +60,7 @@ fun PrestamoDto.toEntity(): PrestamoEntity {
         motivoRechazo = motivoRechazo,
         novedadDevolucion = novedadDevolucion,
         renovaciones = renovaciones,
-        // Al descargar del API, asumimos que si hay una evidencia vinculada (URL), ya está sincronizada
-        // Sin embargo, el DTO actual no tiene campos de evidencia. 
-        // Si el API devolviera una URL de imagen, la mapearíamos aquí.
-        evidenciaSyncEstado = EvidenciaSyncEstado.SINCRONIZADA 
+        evidenciaSyncEstado = EvidenciaSyncEstado.SINCRONIZADA
     )
 }
 
@@ -38,8 +71,8 @@ fun PrestamoEntity.toDomain(): SolicitudPrestamo {
         usuarioId = usuarioId,
         ambienteDestino = ambienteDestino,
         proposito = proposito,
-        fechaSolicitud = LocalDateTime.parse(fechaSolicitud, formatter),
-        fechaInicio = LocalDateTime.parse(fechaInicio, formatter),
+        fechaSolicitud = parseDateSafely(fechaSolicitud),
+        fechaInicio = parseDateSafely(fechaInicio),
         duracionHoras = duracionHoras,
         estado = estado,
         motivoRechazo = motivoRechazo,
@@ -48,7 +81,10 @@ fun PrestamoEntity.toDomain(): SolicitudPrestamo {
         evidenciaUri = evidenciaUri,
         evidenciaMimeType = evidenciaMimeType,
         evidenciaTamano = evidenciaTamano,
-        evidenciaSyncEstado = evidenciaSyncEstado
+        evidenciaSyncEstado = evidenciaSyncEstado,
+        latitud = latitud,
+        longitud = longitud,
+        ubicacionTimestamp = ubicacionTimestamp
     )
 }
 
@@ -69,6 +105,35 @@ fun SolicitudPrestamo.toEntity(): PrestamoEntity {
         evidenciaUri = evidenciaUri,
         evidenciaMimeType = evidenciaMimeType,
         evidenciaTamano = evidenciaTamano,
-        evidenciaSyncEstado = evidenciaSyncEstado
+        evidenciaSyncEstado = evidenciaSyncEstado,
+        latitud = latitud,
+        longitud = longitud,
+        ubicacionTimestamp = ubicacionTimestamp
+    )
+}
+
+fun EquipoEntity.toDomain(): Equipo {
+    return Equipo(
+        id = id,
+        placa = placa,
+        nombre = nombre,
+        categoria = categoria,
+        estado = estado,
+        ubicacion = ubicacion,
+        observaciones = observaciones,
+        imagenUrl = imagenUrl
+    )
+}
+
+fun Equipo.toEntity(): EquipoEntity {
+    return EquipoEntity(
+        id = id,
+        placa = placa,
+        nombre = nombre,
+        categoria = categoria,
+        estado = estado,
+        ubicacion = ubicacion,
+        observaciones = observaciones,
+        imagenUrl = imagenUrl
     )
 }

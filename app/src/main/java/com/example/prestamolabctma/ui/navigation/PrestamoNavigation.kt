@@ -1,5 +1,10 @@
 package com.example.prestamolabctma.ui.navigation
 
+import android.Manifest
+import android.content.Context
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -10,6 +15,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -23,6 +30,8 @@ import androidx.navigation.navArgument
 import com.example.prestamolabctma.model.Role
 import com.example.prestamolabctma.ui.screens.*
 import com.example.prestamolabctma.ui.viewmodel.PrestamoViewModel
+import com.example.prestamolabctma.util.LocationHelper
+import com.example.prestamolabctma.util.NotificationHelper
 
 sealed class Screen(val route: String, val label: String = "") {
     data object Login : Screen("login")
@@ -44,7 +53,7 @@ sealed class Screen(val route: String, val label: String = "") {
 @Composable
 fun PrestamoApp(viewModel: PrestamoViewModel) {
     val navController = rememberNavController()
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(uiState.mensaje) {
@@ -110,7 +119,7 @@ fun PrestamoApp(viewModel: PrestamoViewModel) {
 
 private fun navigateBottom(navController: NavHostController, route: String) {
     navController.navigate(route) {
-        popUpTo(navController.graph.findStartDestination().id) {
+        popUpTo(Screen.Catalogo.route) {
             saveState = true
         }
         launchSingleTop = true
@@ -124,7 +133,35 @@ fun PrestamoNavHost(
     navController: NavHostController,
     modifier: Modifier = Modifier
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    val locationHelper = remember { LocationHelper(context) }
+    val notificationHelper = remember { NotificationHelper(context) }
+
+    // Launcher para solicitar permiso de Ubicación bajo demanda
+    var pendingDevolucionParams by remember { mutableStateOf<Triple<Int, String?, Boolean>?>(null) }
+    val requestLocationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        pendingDevolucionParams?.let { (id, nov, grave) ->
+            viewModel.registrarDevolucionConUbicacion(id, nov, grave, locationHelper)
+            pendingDevolucionParams = null
+        }
+    }
+
+    // Launcher para solicitar permiso de Notificaciones bajo demanda
+    var pendingNotificationSolicitudId by remember { mutableStateOf<Int?>(null) }
+    val requestNotificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        pendingNotificationSolicitudId?.let { id ->
+            if (granted) {
+                viewModel.activarRecordatorioNotificacion(id, notificationHelper)
+            }
+            pendingNotificationSolicitudId = null
+        }
+    }
 
     NavHost(
         navController = navController,
@@ -201,7 +238,14 @@ fun PrestamoNavHost(
             MisPrestamosScreen(
                 solicitudes = uiState.solicitudes.filter { it.usuarioId == uiState.usuarioLogueado?.id },
                 onCancelarClick = { viewModel.procesarSolicitud(it, false, "Cancelada por usuario") },
-                onExtenderClick = { viewModel.solicitarExtension(it) },
+                onExtenderClick = { id ->
+                    if (!notificationHelper.tienePermisoNotificaciones() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        pendingNotificationSolicitudId = id
+                        requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        viewModel.activarRecordatorioNotificacion(id, notificationHelper)
+                    }
+                },
                 onReportarFalla = { solicitudId -> 
                     navController.navigate(Screen.ReportarFalla.createRoute(solicitudId))
                 },
@@ -225,7 +269,19 @@ fun PrestamoNavHost(
             AdminScreen(
                 solicitudes = uiState.solicitudes,
                 onProcesar = { id, ok, mot -> viewModel.procesarSolicitud(id, ok, mot) },
-                onDevolver = { id, nov, grave -> viewModel.registrarDevolucion(id, nov, grave) },
+                onDevolver = { id, nov, grave ->
+                    if (!locationHelper.tienePermisoUbicacion()) {
+                        pendingDevolucionParams = Triple(id, nov, grave)
+                        requestLocationPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
+                        )
+                    } else {
+                        viewModel.registrarDevolucionConUbicacion(id, nov, grave, locationHelper)
+                    }
+                },
                 onBackClick = { navController.popBackStack() }
             )
         }

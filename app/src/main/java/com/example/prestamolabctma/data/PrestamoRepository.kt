@@ -1,16 +1,16 @@
 package com.example.prestamolabctma.data
 
 import com.example.prestamolabctma.model.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import java.io.File
 import java.io.InputStream
-import java.time.LocalDateTime
 
 interface PrestamoRepository {
     // Equipos
-    fun obtenerEquipos(): List<Equipo>
-    fun obtenerEquipo(id: Int): Equipo?
+    suspend fun obtenerEquipos(): List<Equipo>
+    fun obtenerEquiposFlow(): Flow<List<Equipo>>
+    suspend fun obtenerEquipo(id: Int): Equipo?
     fun actualizarEstadoEquipo(id: Int, nuevoEstado: EstadoEquipo)
     
     // Usuarios & Auth
@@ -18,9 +18,9 @@ interface PrestamoRepository {
     fun obtenerUsuario(id: String): Usuario?
 
     // Solicitudes
-    fun obtenerSolicitudes(): List<SolicitudPrestamo>
+    suspend fun obtenerSolicitudes(): List<SolicitudPrestamo>
     fun obtenerSolicitudesFlow(): Flow<List<SolicitudPrestamo>>
-    fun obtenerSolicitud(id: Int): SolicitudPrestamo?
+    suspend fun obtenerSolicitud(id: Int): SolicitudPrestamo?
     fun crearSolicitud(solicitud: SolicitudPrestamo)
     fun actualizarEstadoSolicitud(id: Int, nuevoEstado: EstadoSolicitud, motivo: String? = null)
     
@@ -53,18 +53,22 @@ class InMemoryPrestamoRepository : PrestamoRepository {
         Equipo(5, "PL-005", "Cámara Sony Alpha", CategoriaEquipo.AUDIO_VISUAL, EstadoEquipo.PRESTADO, "Audiovisuales")
     )
 
+    private val equiposFlow = MutableStateFlow<List<Equipo>>(equipos.toList())
     private val solicitudes = mutableListOf<SolicitudPrestamo>()
     private val solicitudesFlow = MutableStateFlow<List<SolicitudPrestamo>>(emptyList())
     private val novedades = mutableListOf<Novedad>()
 
-    override fun obtenerEquipos(): List<Equipo> = equipos.toList()
+    override suspend fun obtenerEquipos(): List<Equipo> = equipos.toList()
 
-    override fun obtenerEquipo(id: Int): Equipo? = equipos.find { it.id == id }
+    override fun obtenerEquiposFlow(): Flow<List<Equipo>> = equiposFlow
+
+    override suspend fun obtenerEquipo(id: Int): Equipo? = equipos.find { it.id == id }
 
     override fun actualizarEstadoEquipo(id: Int, nuevoEstado: EstadoEquipo) {
         val index = equipos.indexOfFirst { it.id == id }
         if (index != -1) {
             equipos[index] = equipos[index].copy(estado = nuevoEstado)
+            equiposFlow.value = equipos.toList()
         }
     }
 
@@ -74,11 +78,11 @@ class InMemoryPrestamoRepository : PrestamoRepository {
 
     override fun obtenerUsuario(id: String): Usuario? = usuarios.find { it.id == id }
 
-    override fun obtenerSolicitudes(): List<SolicitudPrestamo> = solicitudes.toList()
+    override suspend fun obtenerSolicitudes(): List<SolicitudPrestamo> = solicitudes.toList()
 
     override fun obtenerSolicitudesFlow(): Flow<List<SolicitudPrestamo>> = solicitudesFlow
 
-    override fun obtenerSolicitud(id: Int): SolicitudPrestamo? = solicitudes.find { it.id == id }
+    override suspend fun obtenerSolicitud(id: Int): SolicitudPrestamo? = solicitudes.find { it.id == id }
 
     override fun crearSolicitud(solicitud: SolicitudPrestamo) {
         solicitudes.add(solicitud)
@@ -120,7 +124,6 @@ class InMemoryPrestamoRepository : PrestamoRepository {
         novedades.filter { it.equipoId == equipoId }
 
     override suspend fun guardarEvidenciaLocal(inputStream: InputStream, fileName: String): Result<String> {
-        // Simulación: en una app real usaríamos context.filesDir
         return Result.success("internal_storage/$fileName")
     }
 
@@ -142,9 +145,8 @@ class InMemoryPrestamoRepository : PrestamoRepository {
         if (index != -1) {
             solicitudes[index] = solicitudes[index].copy(evidenciaSyncEstado = EvidenciaSyncEstado.SUBIENDO)
             solicitudesFlow.value = solicitudes.toList()
-            
-            // Simular red
-            kotlinx.coroutines.delay(1000)
+
+            delay(1000)
             
             solicitudes[index] = solicitudes[index].copy(evidenciaSyncEstado = EvidenciaSyncEstado.SINCRONIZADA)
             solicitudesFlow.value = solicitudes.toList()

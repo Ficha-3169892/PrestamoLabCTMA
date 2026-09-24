@@ -1,9 +1,12 @@
 package com.example.prestamolabctma.data
 
+import com.example.prestamolabctma.data.local.EquipoDao
+import com.example.prestamolabctma.data.local.EquipoEntity
 import com.example.prestamolabctma.data.local.PrestamoDao
 import com.example.prestamolabctma.data.local.PrestamoEntity
 import com.example.prestamolabctma.data.remote.PrestamoApi
 import com.example.prestamolabctma.data.remote.RetrofitPrestamoDataSource
+import com.example.prestamolabctma.model.EstadoEquipo
 import com.example.prestamolabctma.model.EstadoSolicitud
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,12 +23,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import retrofit2.Retrofit
+import java.io.File
 
 class OfflineFirstPrestamoRepositoryTest {
 
     private lateinit var mockWebServer: MockWebServer
     private lateinit var repository: OfflineFirstPrestamoRepository
     private lateinit var api: PrestamoApi
+    private lateinit var tempDir: File
     
     // Fake DAO usando MutableStateFlow para simular la reactividad de Room
     private val fakeDao = object : PrestamoDao {
@@ -52,9 +57,40 @@ class OfflineFirstPrestamoRepositoryTest {
         }
     }
 
+    private val fakeEquipoDao = object : EquipoDao {
+        private val _equipos = MutableStateFlow<List<EquipoEntity>>(emptyList())
+
+        override fun getAllEquipos() = _equipos
+
+        override suspend fun getEquipoById(id: Int) = _equipos.value.find { it.id == id }
+
+        override suspend fun insertEquipos(equipos: List<EquipoEntity>) {
+            _equipos.update { it + equipos }
+        }
+
+        override suspend fun insertEquipo(equipo: EquipoEntity) {
+            _equipos.update { it + equipo }
+        }
+
+        override suspend fun updateEstadoEquipo(id: Int, nuevoEstado: EstadoEquipo) {
+            _equipos.update { list ->
+                list.map { if (it.id == id) it.copy(estado = nuevoEstado) else it }
+            }
+        }
+
+        override suspend fun deleteAllEquipos() {
+            _equipos.value = emptyList()
+        }
+
+        override suspend fun replaceAll(equipos: List<EquipoEntity>) {
+            _equipos.value = equipos.toList()
+        }
+    }
+
     @Before
     fun setup() {
         mockWebServer = MockWebServer()
+        tempDir = File(System.getProperty("java.io.tmpdir"), "test_evidencias")
         val contentType = "application/json".toMediaType()
         val jsonConfig = Json { 
             ignoreUnknownKeys = true 
@@ -67,7 +103,7 @@ class OfflineFirstPrestamoRepositoryTest {
             .create(PrestamoApi::class.java)
         
         val remoteDataSource = RetrofitPrestamoDataSource(api)
-        repository = OfflineFirstPrestamoRepository(remoteDataSource, fakeDao)
+        repository = OfflineFirstPrestamoRepository(remoteDataSource, fakeDao, fakeEquipoDao, tempDir)
     }
 
     @After

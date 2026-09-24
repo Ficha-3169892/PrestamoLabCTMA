@@ -59,7 +59,11 @@ data class SolicitudPrestamo(
     val evidenciaUri: String? = null,
     val evidenciaMimeType: String? = null,
     val evidenciaTamano: Long? = null,
-    val evidenciaSyncEstado: EvidenciaSyncEstado? = null
+    val evidenciaSyncEstado: EvidenciaSyncEstado? = null,
+    // Semana 9: Capacidad física adicional - Ubicación GPS en entrega/devolución
+    val latitud: Double? = null,
+    val longitud: Double? = null,
+    val ubicacionTimestamp: Long? = null
 )
 
 data class Novedad(

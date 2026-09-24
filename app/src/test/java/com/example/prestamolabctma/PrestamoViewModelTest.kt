@@ -8,6 +8,7 @@ import com.example.prestamolabctma.ui.viewmodel.propositoValido
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -79,7 +80,7 @@ class PrestamoViewModelTest {
     }
 
     @Test
-    fun `HU-04 - Registro de solicitud exitoso`() {
+    fun `HU-04 - Registro de solicitud exitoso`() = runTest {
         viewModel.login("123456", "123")
         val initialCount = repository.obtenerSolicitudes().size
         viewModel.registrarSolicitud(
@@ -89,43 +90,48 @@ class PrestamoViewModelTest {
             horas = 2,
             fechaInicio = LocalDateTime.now()
         )
+        testScheduler.advanceUntilIdle()
         assertEquals(initialCount + 1, repository.obtenerSolicitudes().size)
         assertEquals("Solicitud enviada (Código: RES-${initialCount + 1})", viewModel.uiState.value.mensaje)
     }
 
     @Test
-    fun `HU-06 - Cuentadante aprueba solicitud pendiente`() {
+    fun `HU-06 - Cuentadante aprueba solicitud pendiente`() = runTest {
         viewModel.login("cuentadante", "admin")
         repository.crearSolicitud(SolicitudPrestamo(1, 1, "123456", "Ambiente 1", "Proposito largo", LocalDateTime.now(), LocalDateTime.now(), 2, EstadoSolicitud.SOLICITADA))
         
         viewModel.procesarSolicitud(1, aprobado = true)
+        testScheduler.advanceUntilIdle()
         val sol = repository.obtenerSolicitud(1)
         assertEquals(EstadoSolicitud.APROBADA, sol?.estado)
     }
 
     @Test
-    fun `HU-07 - Registro de devolucion exitoso`() {
+    fun `HU-07 - Registro de devolucion exitoso`() = runTest {
         viewModel.login("cuentadante", "admin")
         repository.crearSolicitud(SolicitudPrestamo(1, 1, "123456", "Ambiente 1", "Proposito largo", LocalDateTime.now(), LocalDateTime.now(), 2, EstadoSolicitud.ENTREGADA))
         
         viewModel.registrarDevolucion(1, novedades = "Todo bien", esGrave = false)
+        testScheduler.advanceUntilIdle()
         assertEquals(EstadoSolicitud.DEVUELTA, repository.obtenerSolicitud(1)?.estado)
         assertEquals(EstadoEquipo.DISPONIBLE, repository.obtenerEquipo(1)?.estado)
     }
 
     @Test
-    fun `HU-08 - Solicitud de renovacion dentro de limites`() {
+    fun `HU-08 - Solicitud de renovacion dentro de limites`() = runTest {
         repository.crearSolicitud(SolicitudPrestamo(1, 1, "123456", "Ambiente 1", "Proposito largo", LocalDateTime.now(), LocalDateTime.now(), 2, EstadoSolicitud.ENTREGADA))
         viewModel.solicitarExtension(1)
+        testScheduler.advanceUntilIdle()
         assertNull(viewModel.uiState.value.mensaje)
     }
 
     @Test
-    fun `HU-09 - Reporte de falla grave inhabilita equipo`() {
+    fun `HU-09 - Reporte de falla grave inhabilita equipo`() = runTest {
         viewModel.login("cuentadante", "admin")
         repository.crearSolicitud(SolicitudPrestamo(1, 1, "123456", "Ambiente 1", "Proposito largo", LocalDateTime.now(), LocalDateTime.now(), 2, EstadoSolicitud.ENTREGADA))
         
         viewModel.registrarDevolucion(1, novedades = "Pantalla rota", esGrave = true)
+        testScheduler.advanceUntilIdle()
         assertEquals(EstadoEquipo.REPARACION, repository.obtenerEquipo(1)?.estado)
     }
 
@@ -168,8 +174,8 @@ class PrestamoViewModelTest {
         
         // 3. Confirmar y subir
         viewModel.confirmarYSubirEvidencia(1)
+        testScheduler.advanceUntilIdle()
         
-        // Con UnconfinedTestDispatcher y runTest, el delay virtual de 1s en InMemoryRepository pasa instantaneamente
         val solicitud = repository.obtenerSolicitud(1)
         assertNotNull(solicitud?.evidenciaUri)
         assertEquals(EvidenciaSyncEstado.SINCRONIZADA, solicitud?.evidenciaSyncEstado)
