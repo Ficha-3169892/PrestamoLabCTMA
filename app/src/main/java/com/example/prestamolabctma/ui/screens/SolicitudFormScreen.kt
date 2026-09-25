@@ -18,7 +18,7 @@ import java.time.format.DateTimeFormatter
 fun SolicitudFormScreen(
     equipo: Equipo,
     guardando: Boolean,
-    onGuardar: (Int, String, String, Int, LocalDateTime) -> Unit,
+    onGuardar: (String, String, String, Int, LocalDateTime) -> Unit,
     onCancelar: () -> Unit
 ) {
     var ambiente by remember { mutableStateOf("") }
@@ -88,7 +88,6 @@ fun SolicitudFormScreen(
 
             Button(
                 onClick = { 
-                    // En el prototipo asumimos que la fecha es válida o usamos NOW
                     onGuardar(equipo.id, ambiente, proposito, duracion, LocalDateTime.now()) 
                 },
                 modifier = Modifier.fillMaxWidth(),

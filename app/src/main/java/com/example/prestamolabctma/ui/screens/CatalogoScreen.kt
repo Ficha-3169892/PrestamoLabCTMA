@@ -6,6 +6,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -26,15 +28,25 @@ fun CatalogoScreen(
     onBusquedaChange: (String) -> Unit,
     categoriaSeleccionada: CategoriaEquipo?,
     onCategoriaChange: (CategoriaEquipo?) -> Unit,
-    onEquipoClick: (Int) -> Unit,
-    onVerMisPrestamos: () -> Unit
+    onEquipoClick: (String) -> Unit,
+    onVerMisPrestamos: () -> Unit,
+    onGestionCatalogo: (() -> Unit)? = null,
+    onLogoutClick: () -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text("Catálogo CTMA") },
             actions = {
+                if (onGestionCatalogo != null) {
+                    IconButton(onClick = onGestionCatalogo) {
+                        Icon(Icons.Default.Build, contentDescription = "Gestionar Mis Equipos")
+                    }
+                }
                 IconButton(onClick = onVerMisPrestamos) {
                     Icon(Icons.Default.List, contentDescription = "Mis Préstamos")
+                }
+                IconButton(onClick = onLogoutClick) {
+                    Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Cerrar Sesión")
                 }
             }
         )
@@ -63,7 +75,7 @@ fun CatalogoScreen(
                         label = { Text("Todos") }
                     )
                 }
-                CategoriaEquipo.values().forEach { categoria ->
+                CategoriaEquipo.entries.forEach { categoria ->
                     item {
                         FilterChip(
                             selected = categoriaSeleccionada == categoria,

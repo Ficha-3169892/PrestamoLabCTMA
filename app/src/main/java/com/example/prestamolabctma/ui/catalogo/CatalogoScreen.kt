@@ -15,7 +15,7 @@ import com.example.prestamolabctma.model.EstadoEquipo
 @Composable
 fun CatalogoScreen(
     equipos: List<Equipo>,
-    onEquipoClick: (Int) -> Unit
+    onEquipoClick: (String) -> Unit
 ) {
     Scaffold(
         topBar = {

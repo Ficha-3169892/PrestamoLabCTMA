@@ -8,15 +8,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.prestamolabctma.model.Equipo
-import com.example.prestamolabctma.viewmodel.duracionValida
-import com.example.prestamolabctma.viewmodel.propositoValido
+import com.example.prestamolabctma.ui.viewmodel.duracionValida
+import com.example.prestamolabctma.ui.viewmodel.propositoValido
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FormularioSolicitudScreen(
     equipo: Equipo,
     guardando: Boolean,
-    onGuardar: (Int, String, String, Int) -> Unit,
+    onGuardar: (String, String, String, Int) -> Unit,
     onCancelar: () -> Unit
 ) {
     var ambiente by remember { mutableStateOf("") }
