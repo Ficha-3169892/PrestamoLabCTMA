@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.prestamolabctma.model.EstadoSolicitud
@@ -16,7 +17,7 @@ import com.example.prestamolabctma.model.Equipo
 fun MisPrestamosScreen(
     solicitudes: List<SolicitudPrestamo>,
     equipos: List<Equipo>,
-    onCancelarSolicitud: (Int) -> Unit
+    onCancelarSolicitud: (String) -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -24,7 +25,7 @@ fun MisPrestamosScreen(
         }
     ) { padding ->
         if (solicitudes.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = androidx.compose.ui.Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Text("No tienes solicitudes activas")
             }
         } else {
@@ -37,7 +38,7 @@ fun MisPrestamosScreen(
                     val equipo = equipos.find { it.id == solicitud.equipoId }
                     SolicitudItem(
                         solicitud = solicitud,
-                        nombreEquipo = equipo?.nombre ?: "Equipo Desconocido",
+                        nombreEquipo = equipo?.nombre ?: solicitud.equipoNombre,
                         onCancelar = { onCancelarSolicitud(solicitud.id) }
                     )
                 }
@@ -58,7 +59,7 @@ fun SolicitudItem(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = nombreEquipo, style = MaterialTheme.typography.titleMedium)
-            Text(text = "Ambiente: ${solicitud.ambienteDestino}", style = MaterialTheme.typography.bodyMedium)
+            Text(text = "Placa: ${solicitud.equipoPlaca}", style = MaterialTheme.typography.bodyMedium)
             Text(text = "Estado: ${solicitud.estado}", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
             
             if (solicitud.estado == EstadoSolicitud.SOLICITADA) {

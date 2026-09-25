@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,24 +17,48 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.prestamolabctma.model.EstadoSolicitud
 import com.example.prestamolabctma.model.SolicitudPrestamo
+import com.example.prestamolabctma.ui.viewmodel.PrestamoViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminScreen(
     solicitudes: List<SolicitudPrestamo>,
-    onProcesar: (Int, Boolean, String?) -> Unit,
-    onDevolver: (Int, String?, Boolean) -> Unit,
-    onBackClick: () -> Unit
+    instructorId: String,
+    viewModel: PrestamoViewModel,
+    onAprobar: (String, String?) -> Unit,
+    onRechazar: (String) -> Unit,
+    onEntregar: (String) -> Unit,
+    onDevolver: (String, String?) -> Unit,
+    onBackClick: () -> Unit,
+    onLogoutClick: () -> Unit = {}
 ) {
     var tabSelected by remember { mutableStateOf(0) }
-    val tabs = listOf("Pendientes", "Entregados")
+    val tabs = listOf("Pendientes", "Por Entregar", "En Curso")
+    var nombresAprendices by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+
+    val misSolicitudes = solicitudes.filter { it.instructorId == instructorId }
+
+    LaunchedEffect(misSolicitudes) {
+        val ids = misSolicitudes.map { it.aprendizId }.distinct()
+        val mapa = mutableMapOf<String, String>()
+        for (id in ids) {
+            val nombre = viewModel.obtenerNombreUsuario(id)
+            mapa[id] = nombre
+        }
+        nombresAprendices = mapa
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text("Panel Administrativo") },
+            title = { Text("Panel de Gestión") },
             navigationIcon = {
                 IconButton(onClick = onBackClick) {
                     Text("←")
+                }
+            },
+            actions = {
+                IconButton(onClick = onLogoutClick) {
+                    Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Cerrar Sesión")
                 }
             }
         )
@@ -47,10 +73,10 @@ fun AdminScreen(
             }
         }
 
-        val listaMostrar = if (tabSelected == 0) {
-            solicitudes.filter { it.estado == EstadoSolicitud.SOLICITADA }
-        } else {
-            solicitudes.filter { it.estado == EstadoSolicitud.ENTREGADA }
+        val listaMostrar = when (tabSelected) {
+            0 -> misSolicitudes.filter { it.estado == EstadoSolicitud.SOLICITADA }
+            1 -> misSolicitudes.filter { it.estado == EstadoSolicitud.APROBADA }
+            else -> misSolicitudes.filter { it.estado == EstadoSolicitud.ENTREGADA }
         }
 
         if (listaMostrar.isEmpty()) {
@@ -64,10 +90,11 @@ fun AdminScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(listaMostrar) { solicitud ->
-                    if (tabSelected == 0) {
-                        AprobacionCard(solicitud, onProcesar)
-                    } else {
-                        DevolucionCard(solicitud, onDevolver)
+                    val nombreAprendiz = nombresAprendices[solicitud.aprendizId] ?: solicitud.aprendizId.take(8)
+                    when (tabSelected) {
+                        0 -> SolicitudPendienteCard(solicitud, nombreAprendiz, onAprobar, onRechazar)
+                        1 -> SolicitudAprobadaCard(solicitud, nombreAprendiz, onEntregar)
+                        else -> PrestamoEnCursoCard(solicitud, nombreAprendiz, onDevolver)
                     }
                 }
             }
@@ -76,19 +103,24 @@ fun AdminScreen(
 }
 
 @Composable
-fun AprobacionCard(solicitud: SolicitudPrestamo, onProcesar: (Int, Boolean, String?) -> Unit) {
+fun SolicitudPendienteCard(
+    solicitud: SolicitudPrestamo,
+    nombreAprendiz: String,
+    onAprobar: (String, String?) -> Unit,
+    onRechazar: (String) -> Unit
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Solicitud #${solicitud.id}", style = MaterialTheme.typography.titleMedium)
-            Text("Aprendiz: ${solicitud.usuarioId}")
-            Text("Equipo ID: ${solicitud.equipoId}")
-            Text("Motivo: ${solicitud.proposito}")
+            Text("Solicitud #${solicitud.id.take(8)}", style = MaterialTheme.typography.titleMedium)
+            Text("Equipo: ${solicitud.equipoNombre} (${solicitud.equipoPlaca})")
+            Text("Aprendiz: $nombreAprendiz")
+            Text("Fecha: ${solicitud.fechaSolicitud}")
             
             Spacer(modifier = Modifier.height(16.dp))
             
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
-                    onClick = { onProcesar(solicitud.id, true, null) },
+                    onClick = { onAprobar(solicitud.id, solicitud.equipoId) },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
                 ) {
@@ -97,7 +129,7 @@ fun AprobacionCard(solicitud: SolicitudPrestamo, onProcesar: (Int, Boolean, Stri
                     Text("Aprobar")
                 }
                 OutlinedButton(
-                    onClick = { onProcesar(solicitud.id, false, "No disponible") },
+                    onClick = { onRechazar(solicitud.id) },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)
                 ) {
@@ -111,58 +143,53 @@ fun AprobacionCard(solicitud: SolicitudPrestamo, onProcesar: (Int, Boolean, Stri
 }
 
 @Composable
-fun DevolucionCard(solicitud: SolicitudPrestamo, onDevolver: (Int, String?, Boolean) -> Unit) {
-    var showDialog by remember { mutableStateOf(false) }
-    var novedad by remember { mutableStateOf("") }
-    var esGrave by remember { mutableStateOf(false) }
-
+fun SolicitudAprobadaCard(
+    solicitud: SolicitudPrestamo,
+    nombreAprendiz: String,
+    onEntregar: (String) -> Unit
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Préstamo en Curso #${solicitud.id}", style = MaterialTheme.typography.titleMedium)
-            Text("Equipo ID: ${solicitud.equipoId}")
-            Text("Ubicación: ${solicitud.ambienteDestino}")
+            Text("Aprobada #${solicitud.id.take(8)}", style = MaterialTheme.typography.titleMedium)
+            Text("Equipo: ${solicitud.equipoNombre} (${solicitud.equipoPlaca})")
+            Text("Aprendiz: $nombreAprendiz")
             
             Spacer(modifier = Modifier.height(16.dp))
             
             Button(
-                onClick = { showDialog = true },
+                onClick = { onEntregar(solicitud.id) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.LocalShipping, null)
+                Spacer(Modifier.width(8.dp))
+                Text("Marcar Entregado")
+            }
+        }
+    }
+}
+
+@Composable
+fun PrestamoEnCursoCard(
+    solicitud: SolicitudPrestamo,
+    nombreAprendiz: String,
+    onDevolver: (String, String?) -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("En Curso #${solicitud.id.take(8)}", style = MaterialTheme.typography.titleMedium)
+            Text("Equipo: ${solicitud.equipoNombre} (${solicitud.equipoPlaca})")
+            Text("Aprendiz: $nombreAprendiz")
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Button(
+                onClick = { onDevolver(solicitud.id, solicitud.equipoId) },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(Icons.Default.Refresh, null)
                 Spacer(Modifier.width(8.dp))
-                Text("Registrar Devolución")
+                Text("Marcar Devuelto")
             }
         }
-    }
-
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { showDialog = false },
-            title = { Text("Inspección de Devolución") },
-            text = {
-                Column {
-                    Text("¿El equipo presenta novedades?")
-                    OutlinedTextField(
-                        value = novedad,
-                        onValueChange = { novedad = it },
-                        label = { Text("Descripción de novedad (opcional)") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(checked = esGrave, onCheckedChange = { esGrave = it })
-                        Text("¿Es una falla grave / Daño?")
-                    }
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    onDevolver(solicitud.id, if(novedad.isBlank()) null else novedad, esGrave)
-                    showDialog = false
-                }) { Text("Confirmar") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDialog = false }) { Text("Cancelar") }
-            }
-        )
     }
 }

@@ -12,7 +12,7 @@ import com.example.prestamolabctma.model.EstadoEquipo
 @Composable
 fun EquipoDetalleScreen(
     equipo: Equipo?,
-    onSolicitarClick: (Int) -> Unit
+    onSolicitarClick: (String) -> Unit
 ) {
     Scaffold(
         topBar = {

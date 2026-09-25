@@ -1,7 +1,6 @@
 package com.example.prestamolabctma.data
 
 import com.example.prestamolabctma.model.*
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.io.InputStream
@@ -10,26 +9,38 @@ interface PrestamoRepository {
     // Equipos
     suspend fun obtenerEquipos(): List<Equipo>
     fun obtenerEquiposFlow(): Flow<List<Equipo>>
-    suspend fun obtenerEquipo(id: Int): Equipo?
-    fun actualizarEstadoEquipo(id: Int, nuevoEstado: EstadoEquipo)
+    suspend fun obtenerEquipo(id: String): Equipo?
+    fun actualizarEstadoEquipo(id: String, nuevoEstado: EstadoEquipo)
+    suspend fun obtenerEquiposDisponibles(): List<Equipo>
+    suspend fun obtenerEquiposInstructor(instructorId: String): List<Equipo>
+    suspend fun guardarEquipo(equipo: Equipo, instructorId: String): Result<Unit>
+    suspend fun actualizarEquipo(equipo: Equipo, instructorId: String): Result<Unit>
+    suspend fun eliminarEquipo(equipoId: String, instructorId: String): Result<Unit>
     
     // Usuarios & Auth
     fun validarUsuario(identificador: String, contrasena: String): Usuario?
     fun obtenerUsuario(id: String): Usuario?
+    suspend fun obtenerNombreUsuario(userId: String): String
 
-    // Solicitudes
+    // Solicitudes & Préstamos
     suspend fun obtenerSolicitudes(): List<SolicitudPrestamo>
     fun obtenerSolicitudesFlow(): Flow<List<SolicitudPrestamo>>
     suspend fun obtenerSolicitud(id: Int): SolicitudPrestamo?
     fun crearSolicitud(solicitud: SolicitudPrestamo)
     fun actualizarEstadoSolicitud(id: Int, nuevoEstado: EstadoSolicitud, motivo: String? = null)
+
+    suspend fun solicitarPrestamo(equipo: Equipo, aprendizId: String): Result<Unit>
+    suspend fun aprobarPrestamo(prestamoId: String, equipoId: String?): Result<Unit>
+    suspend fun rechazarPrestamo(prestamoId: String): Result<Unit>
+    suspend fun entregarPrestamo(prestamoId: String): Result<Unit>
+    suspend fun devolverPrestamo(prestamoId: String, equipoId: String?): Result<Unit>
     
     // Remote
     suspend fun refreshPrestamos(): Result<Unit>
     
     // Novedades
     fun registrarNovedad(novedad: Novedad)
-    fun obtenerNovedadesPorEquipo(equipoId: Int): List<Novedad>
+    fun obtenerNovedadesPorEquipo(equipoId: String): List<Novedad>
 
     // Semana 9: Evidencia fotográfica
     suspend fun guardarEvidenciaLocal(inputStream: InputStream, fileName: String): Result<String>
@@ -46,11 +57,11 @@ class InMemoryPrestamoRepository : PrestamoRepository {
     )
 
     private val equipos = mutableListOf(
-        Equipo(1, "PL-001", "Osciloscopio Digital", CategoriaEquipo.ELECTRONICA, EstadoEquipo.DISPONIBLE, "Laboratorio 1", "Calibrado 2024"),
-        Equipo(2, "PL-002", "Multímetro Fluke", CategoriaEquipo.ELECTRONICA, EstadoEquipo.DISPONIBLE, "Laboratorio 1"),
-        Equipo(3, "PL-003", "Taladro Percutor", CategoriaEquipo.HERRAMIENTAS, EstadoEquipo.DISPONIBLE, "Taller Mecánica"),
-        Equipo(4, "PL-004", "Laptop Dell Precision", CategoriaEquipo.COMPUTO, EstadoEquipo.MANTENIMIENTO, "Almacén"),
-        Equipo(5, "PL-005", "Cámara Sony Alpha", CategoriaEquipo.AUDIO_VISUAL, EstadoEquipo.PRESTADO, "Audiovisuales")
+        Equipo("1", "PL-001", "Osciloscopio Digital", CategoriaEquipo.ELECTRONICA, EstadoEquipo.DISPONIBLE, "Laboratorio 1", "Calibrado 2024"),
+        Equipo("2", "PL-002", "Multímetro Fluke", CategoriaEquipo.ELECTRONICA, EstadoEquipo.DISPONIBLE, "Laboratorio 1"),
+        Equipo("3", "PL-003", "Taladro Percutor", CategoriaEquipo.HERRAMIENTAS, EstadoEquipo.DISPONIBLE, "Taller Mecánica"),
+        Equipo("4", "PL-004", "Laptop Dell Precision", CategoriaEquipo.COMPUTO, EstadoEquipo.MANTENIMIENTO, "Almacén"),
+        Equipo("5", "PL-005", "Cámara Sony Alpha", CategoriaEquipo.AUDIO_VISUAL, EstadoEquipo.PRESTADO, "Audiovisuales")
     )
 
     private val equiposFlow = MutableStateFlow<List<Equipo>>(equipos.toList())
@@ -62,14 +73,40 @@ class InMemoryPrestamoRepository : PrestamoRepository {
 
     override fun obtenerEquiposFlow(): Flow<List<Equipo>> = equiposFlow
 
-    override suspend fun obtenerEquipo(id: Int): Equipo? = equipos.find { it.id == id }
+    override suspend fun obtenerEquipo(id: String): Equipo? = equipos.find { it.id == id }
 
-    override fun actualizarEstadoEquipo(id: Int, nuevoEstado: EstadoEquipo) {
+    override fun actualizarEstadoEquipo(id: String, nuevoEstado: EstadoEquipo) {
         val index = equipos.indexOfFirst { it.id == id }
         if (index != -1) {
             equipos[index] = equipos[index].copy(estado = nuevoEstado)
             equiposFlow.value = equipos.toList()
         }
+    }
+
+    override suspend fun obtenerEquiposDisponibles(): List<Equipo> = equipos.filter { it.estado == EstadoEquipo.DISPONIBLE }
+
+    override suspend fun obtenerEquiposInstructor(instructorId: String): List<Equipo> = equipos.filter { it.instructorId == instructorId }
+
+    override suspend fun guardarEquipo(equipo: Equipo, instructorId: String): Result<Unit> {
+        equipos.add(equipo)
+        equiposFlow.value = equipos.toList()
+        return Result.success(Unit)
+    }
+
+    override suspend fun actualizarEquipo(equipo: Equipo, instructorId: String): Result<Unit> {
+        val index = equipos.indexOfFirst { it.id == equipo.id }
+        if (index != -1) {
+            equipos[index] = equipo
+            equiposFlow.value = equipos.toList()
+            return Result.success(Unit)
+        }
+        return Result.failure(Exception("Equipo no encontrado"))
+    }
+
+    override suspend fun eliminarEquipo(equipoId: String, instructorId: String): Result<Unit> {
+        equipos.removeAll { it.id == equipoId }
+        equiposFlow.value = equipos.toList()
+        return Result.success(Unit)
     }
 
     override fun validarUsuario(identificador: String, contrasena: String): Usuario? {
@@ -78,36 +115,42 @@ class InMemoryPrestamoRepository : PrestamoRepository {
 
     override fun obtenerUsuario(id: String): Usuario? = usuarios.find { it.id == id }
 
+    override suspend fun obtenerNombreUsuario(userId: String): String {
+        return usuarios.find { it.id == userId }?.nombre ?: userId.take(8)
+    }
+
     override suspend fun obtenerSolicitudes(): List<SolicitudPrestamo> = solicitudes.toList()
 
     override fun obtenerSolicitudesFlow(): Flow<List<SolicitudPrestamo>> = solicitudesFlow
 
-    override suspend fun obtenerSolicitud(id: Int): SolicitudPrestamo? = solicitudes.find { it.id == id }
+    override suspend fun obtenerSolicitud(id: Int): SolicitudPrestamo? = null
 
     override fun crearSolicitud(solicitud: SolicitudPrestamo) {
         solicitudes.add(solicitud)
         solicitudesFlow.value = solicitudes.toList()
-        if (solicitud.estado == EstadoSolicitud.APROBADA || solicitud.estado == EstadoSolicitud.SOLICITADA) {
-            actualizarEstadoEquipo(solicitud.equipoId, EstadoEquipo.RESERVADO)
-        }
     }
 
-    override fun actualizarEstadoSolicitud(id: Int, nuevoEstado: EstadoSolicitud, motivo: String?) {
-        val index = solicitudes.indexOfFirst { it.id == id }
-        if (index != -1) {
-            val oldSol = solicitudes[index]
-            solicitudes[index] = oldSol.copy(estado = nuevoEstado, motivoRechazo = motivo)
-            solicitudesFlow.value = solicitudes.toList()
-            
-            when (nuevoEstado) {
-                EstadoSolicitud.ENTREGADA -> actualizarEstadoEquipo(oldSol.equipoId, EstadoEquipo.PRESTADO)
-                EstadoSolicitud.DEVUELTA, EstadoSolicitud.CANCELADA, EstadoSolicitud.RECHAZADA -> 
-                    actualizarEstadoEquipo(oldSol.equipoId, EstadoEquipo.DISPONIBLE)
-                EstadoSolicitud.EN_REVISION -> actualizarEstadoEquipo(oldSol.equipoId, EstadoEquipo.REPARACION)
-                else -> {}
-            }
-        }
+    override fun actualizarEstadoSolicitud(id: Int, nuevoEstado: EstadoSolicitud, motivo: String?) {}
+
+    override suspend fun solicitarPrestamo(equipo: Equipo, aprendizId: String): Result<Unit> {
+        val sol = SolicitudPrestamo(
+            id = (0..10000).random().toString(),
+            equipoId = equipo.id,
+            equipoNombre = equipo.nombre,
+            equipoPlaca = equipo.placa,
+            equipoCategoria = equipo.categoria.name,
+            instructorId = equipo.instructorId ?: "instructor_demo",
+            aprendizId = aprendizId,
+            estado = EstadoSolicitud.SOLICITADA
+        )
+        crearSolicitud(sol)
+        return Result.success(Unit)
     }
+
+    override suspend fun aprobarPrestamo(prestamoId: String, equipoId: String?): Result<Unit> = Result.success(Unit)
+    override suspend fun rechazarPrestamo(prestamoId: String): Result<Unit> = Result.success(Unit)
+    override suspend fun entregarPrestamo(prestamoId: String): Result<Unit> = Result.success(Unit)
+    override suspend fun devolverPrestamo(prestamoId: String, equipoId: String?): Result<Unit> = Result.success(Unit)
 
     override suspend fun refreshPrestamos(): Result<Unit> {
         return Result.success(Unit)
@@ -115,42 +158,18 @@ class InMemoryPrestamoRepository : PrestamoRepository {
 
     override fun registrarNovedad(novedad: Novedad) {
         novedades.add(novedad)
-        if (novedad.esGrave) {
-            actualizarEstadoEquipo(novedad.equipoId, EstadoEquipo.MANTENIMIENTO)
-        }
     }
 
-    override fun obtenerNovedadesPorEquipo(equipoId: Int): List<Novedad> = 
+    override fun obtenerNovedadesPorEquipo(equipoId: String): List<Novedad> = 
         novedades.filter { it.equipoId == equipoId }
 
     override suspend fun guardarEvidenciaLocal(inputStream: InputStream, fileName: String): Result<String> {
         return Result.success("internal_storage/$fileName")
     }
 
-    override suspend fun vincularEvidenciaASolicitud(solicitudId: Int, uri: String, mimeType: String, tamano: Long) {
-        val index = solicitudes.indexOfFirst { it.id == solicitudId }
-        if (index != -1) {
-            solicitudes[index] = solicitudes[index].copy(
-                evidenciaUri = uri,
-                evidenciaMimeType = mimeType,
-                evidenciaTamano = tamano,
-                evidenciaSyncEstado = EvidenciaSyncEstado.LOCAL
-            )
-            solicitudesFlow.value = solicitudes.toList()
-        }
-    }
+    override suspend fun vincularEvidenciaASolicitud(solicitudId: Int, uri: String, mimeType: String, tamano: Long) {}
 
     override suspend fun subirEvidenciaAlServidor(solicitudId: Int): Result<Unit> {
-        val index = solicitudes.indexOfFirst { it.id == solicitudId }
-        if (index != -1) {
-            solicitudes[index] = solicitudes[index].copy(evidenciaSyncEstado = EvidenciaSyncEstado.SUBIENDO)
-            solicitudesFlow.value = solicitudes.toList()
-
-            delay(1000)
-            
-            solicitudes[index] = solicitudes[index].copy(evidenciaSyncEstado = EvidenciaSyncEstado.SINCRONIZADA)
-            solicitudesFlow.value = solicitudes.toList()
-        }
         return Result.success(Unit)
     }
 }

@@ -3,6 +3,7 @@ package com.example.prestamolabctma.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -12,13 +13,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.prestamolabctma.model.Equipo
 import com.example.prestamolabctma.model.EstadoEquipo
+import com.example.prestamolabctma.model.Role
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EquipoDetalleScreen(
     equipo: Equipo?,
-    onSolicitarClick: (Int) -> Unit,
-    onBackClick: () -> Unit
+    userRole: Role?,
+    onSolicitarClick: (Equipo) -> Unit,
+    onUpdateEstado: (Equipo, EstadoEquipo) -> Unit,
+    onBackClick: () -> Unit,
+    onLogoutClick: () -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
@@ -26,6 +31,11 @@ fun EquipoDetalleScreen(
             navigationIcon = {
                 IconButton(onClick = onBackClick) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Regresar")
+                }
+            },
+            actions = {
+                IconButton(onClick = onLogoutClick) {
+                    Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Cerrar Sesión")
                 }
             }
         )
@@ -46,7 +56,6 @@ fun EquipoDetalleScreen(
                     elevation = CardDefaults.cardElevation(4.dp)
                 ) {
                     Column(modifier = Modifier.padding(24.dp)) {
-                        // HU 03: Ficha técnica detallada
                         Text(text = equipo.nombre, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                         Text(text = "Placa: ${equipo.placa}", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.secondary)
                         
@@ -55,15 +64,14 @@ fun EquipoDetalleScreen(
                         Text(text = "Categoría: ${equipo.categoria}", style = MaterialTheme.typography.bodyMedium)
                         Text(text = "Ubicación: ${equipo.ubicacion}", style = MaterialTheme.typography.bodyMedium)
                         
-                        if (equipo.observaciones.isNotEmpty()) {
+                        if (equipo.descripcion.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text(text = "Observaciones técnicas:", style = MaterialTheme.typography.labelLarge)
-                            Text(text = equipo.observaciones, style = MaterialTheme.typography.bodySmall)
+                            Text(text = "Descripción técnica:", style = MaterialTheme.typography.labelLarge)
+                            Text(text = equipo.descripcion, style = MaterialTheme.typography.bodySmall)
                         }
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         
-                        // HU 03: Reglas de negocio (Disponibilidad y Reparación)
                         val puedeSolicitar = equipo.estado == EstadoEquipo.DISPONIBLE
                         val esReparacion = equipo.estado == EstadoEquipo.REPARACION || equipo.estado == EstadoEquipo.MANTENIMIENTO
                         
@@ -80,20 +88,50 @@ fun EquipoDetalleScreen(
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        Button(
-                            onClick = { onSolicitarClick(equipo.id) },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = puedeSolicitar && !esReparacion,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (esReparacion) Color.Gray else MaterialTheme.colorScheme.primary
+                        if (userRole == Role.INSTRUCTOR) {
+                            Text(
+                                text = "Panel de Instructor: Cambiar Estado",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
                             )
-                        ) {
-                            val btnText = when {
-                                esReparacion -> "En mantenimiento / Reparación"
-                                !puedeSolicitar -> "No disponible"
-                                else -> "Iniciar Solicitud de Préstamo"
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = { onUpdateEstado(equipo, EstadoEquipo.DISPONIBLE) },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                                    enabled = equipo.estado != EstadoEquipo.DISPONIBLE
+                                ) {
+                                    Text("Marcar Disponible")
+                                }
+                                Button(
+                                    onClick = { onUpdateEstado(equipo, EstadoEquipo.MANTENIMIENTO) },
+                                    modifier = Modifier.weight(1f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9E9E9E)),
+                                    enabled = equipo.estado != EstadoEquipo.MANTENIMIENTO
+                                ) {
+                                    Text("Marcar Mantenimiento")
+                                }
                             }
-                            Text(btnText)
+                        } else {
+                            Button(
+                                onClick = { onSolicitarClick(equipo) },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = puedeSolicitar && !esReparacion,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (esReparacion) Color.Gray else MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                val btnText = when {
+                                    esReparacion -> "En mantenimiento / Reparación"
+                                    !puedeSolicitar -> "No disponible"
+                                    else -> "Iniciar Solicitud de Préstamo"
+                                }
+                                Text(btnText)
+                            }
                         }
                     }
                 }

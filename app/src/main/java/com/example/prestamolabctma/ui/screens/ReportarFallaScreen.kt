@@ -3,10 +3,13 @@ package com.example.prestamolabctma.ui.screens
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -29,7 +32,7 @@ import java.io.File
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportarFallaScreen(
-    solicitudId: Int,
+    solicitudId: String,
     viewModel: PrestamoViewModel,
     onNavigateBack: () -> Unit
 ) {
@@ -37,112 +40,111 @@ fun ReportarFallaScreen(
     val uiState by viewModel.uiState.collectAsState()
     val evidenciaEstado = uiState.evidenciaEstado
     
-    // URI temporal para la captura de cámara
+    var descripcion by remember { mutableStateOf("") }
     var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
 
-    // Launcher para Galería (Photo Picker - Mínimo Privilegio)
-    val pickMedia = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
-            procesarUri(context, uri, viewModel)
+    // Launcher para Galería (Múltiples imágenes)
+    val pickMultipleMedia = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia()
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            uris.forEach { uri ->
+                viewModel.agregarFoto(uri)
+            }
         }
     }
 
-    // Launcher para Cámara (TakePicture - FileProvider)
+    // Launcher para Cámara
     val takePicture = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
-        if (success) {
-            tempCameraUri?.let { uri ->
-                procesarUri(context, uri, viewModel)
-            }
+        if (success && tempCameraUri != null) {
+            viewModel.agregarFoto(tempCameraUri!!)
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Reportar Falla Grave") },
+                title = { Text("Reportar Novedad / Falla") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Atrás")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Regresar")
                     }
                 }
             )
         }
-    ) { padding ->
+    ) { innerPadding ->
         Column(
             modifier = Modifier
-                .padding(padding)
-                .padding(16.dp)
                 .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp)
                 .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                "Adjunte evidencia fotográfica de la falla para inhabilitar el equipo.",
-                style = MaterialTheme.typography.bodyMedium
+            // BUG 2: Campo de descripción obligatoria
+            OutlinedTextField(
+                value = descripcion,
+                onValueChange = { descripcion = it },
+                label = { Text("Descripción de la novedad o falla *") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+                supportingText = { Text("Campo obligatorio para generar el reporte") }
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Text("Evidencia Fotográfica (Opcional / Múltiples fotos)", style = MaterialTheme.typography.titleMedium)
 
-            // Previsualización de Imagen
-            if (evidenciaEstado.uriPreview != null) {
-                Box(modifier = Modifier.fillMaxWidth().height(250.dp)) {
-                    AsyncImage(
-                        model = evidenciaEstado.uriPreview,
-                        contentDescription = "Evidencia",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    IconButton(
-                        onClick = { viewModel.eliminarEvidencia() },
-                        modifier = Modifier.align(Alignment.TopEnd),
-                        colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
-                    ) {
-                        Icon(Icons.Default.Delete, "Eliminar", tint = MaterialTheme.colorScheme.error)
+            // Previsualización de Fotos en carrusel horizontal
+            if (evidenciaEstado.fotosUris.isNotEmpty()) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth().height(120.dp)
+                ) {
+                    items(evidenciaEstado.fotosUris) { uri ->
+                        Box(modifier = Modifier.size(120.dp)) {
+                            AsyncImage(
+                                model = uri,
+                                contentDescription = "Foto evidencia",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                            IconButton(
+                                onClick = { viewModel.eliminarFoto(uri) },
+                                modifier = Modifier.align(Alignment.TopEnd),
+                                colors = IconButtonDefaults.iconButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f))
+                            ) {
+                                Icon(Icons.Default.Delete, "Eliminar", tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
                     }
                 }
             } else {
                 OutlinedCard(
-                    modifier = Modifier.fillMaxWidth().height(150.dp),
-                    onClick = { /* Opcional: abrir selector */ }
+                    modifier = Modifier.fillMaxWidth().height(100.dp)
                 ) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Sin evidencia adjunta", color = MaterialTheme.colorScheme.outline)
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Ninguna foto seleccionada aún")
                     }
                 }
             }
 
-            if (evidenciaEstado.mensajeError != null) {
-                Text(
-                    text = evidenciaEstado.mensajeError,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Botones de Acción
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(
+                OutlinedButton(
                     onClick = {
-                        pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        pickMultipleMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     },
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(Icons.Default.Image, null)
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(4.dp))
                     Text("Galería")
                 }
 
-                Button(
+                OutlinedButton(
                     onClick = {
                         val uri = crearUriTemporal(context)
                         tempCameraUri = uri
@@ -151,64 +153,34 @@ fun ReportarFallaScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(Icons.Default.CameraAlt, null)
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(4.dp))
                     Text("Cámara")
                 }
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Button(
                 onClick = {
-                    viewModel.confirmarYSubirEvidencia(solicitudId)
-                    onNavigateBack()
+                    viewModel.crearReporteNovedad(solicitudId, descripcion, context) {
+                        onNavigateBack()
+                    }
                 },
-                enabled = evidenciaEstado.uriPreview != null && !evidenciaEstado.procesando,
-                modifier = Modifier.fillMaxWidth().height(56.dp)
+                modifier = Modifier.fillMaxWidth(),
+                enabled = descripcion.isNotBlank() && !evidenciaEstado.procesando
             ) {
                 if (evidenciaEstado.procesando) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
                 } else {
-                    Text("Confirmar y Enviar Reporte")
+                    Text("Enviar Reporte")
                 }
             }
         }
     }
 }
 
-/**
- * Crea una URI segura usando FileProvider para guardar la captura de cámara.
- */
 private fun crearUriTemporal(context: Context): Uri {
-    val tempFile = File.createTempFile("CAPTURA_", ".jpg", context.cacheDir).apply {
-        deleteOnExit()
-    }
-    return FileProvider.getUriForFile(
-        context,
-        "${context.packageName}.fileprovider",
-        tempFile
-    )
-}
-
-/**
- * Extrae metadatos de la URI y envía el stream al ViewModel para persistencia interna.
- */
-private fun procesarUri(context: Context, uri: Uri, viewModel: PrestamoViewModel) {
-    val contentResolver = context.contentResolver
-    val inputStream = contentResolver.openInputStream(uri) ?: return
-    
-    var fileName = "evidencia.jpg"
-    var size = 0L
-    val mimeType = contentResolver.getType(uri) ?: "image/jpeg"
-
-    contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-        val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-        if (cursor.moveToFirst()) {
-            fileName = cursor.getString(nameIndex)
-            size = cursor.getLong(sizeIndex)
-        }
-    }
-
-    viewModel.adjuntarEvidencia(inputStream, fileName, mimeType, size)
+    val directory = File(context.cacheDir, "images").apply { if (!exists()) mkdirs() }
+    val file = File(directory, "temp_camera_${System.currentTimeMillis()}.jpg")
+    return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 }

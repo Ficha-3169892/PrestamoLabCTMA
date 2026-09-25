@@ -10,7 +10,7 @@ interface EquipoDao {
     fun getAllEquipos(): Flow<List<EquipoEntity>>
 
     @Query("SELECT * FROM equipos WHERE id = :id")
-    suspend fun getEquipoById(id: Int): EquipoEntity?
+    suspend fun getEquipoById(id: String): EquipoEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEquipos(equipos: List<EquipoEntity>)
@@ -19,7 +19,10 @@ interface EquipoDao {
     suspend fun insertEquipo(equipo: EquipoEntity)
 
     @Query("UPDATE equipos SET estado = :nuevoEstado WHERE id = :id")
-    suspend fun updateEstadoEquipo(id: Int, nuevoEstado: EstadoEquipo)
+    suspend fun updateEstadoEquipo(id: String, nuevoEstado: EstadoEquipo)
+
+    @Query("DELETE FROM equipos WHERE id = :id")
+    suspend fun deleteEquipoById(id: String)
 
     @Query("DELETE FROM equipos")
     suspend fun deleteAllEquipos()

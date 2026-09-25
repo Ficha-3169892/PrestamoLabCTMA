@@ -7,12 +7,13 @@ import com.example.prestamolabctma.model.EstadoEquipo
 
 @Entity(tableName = "equipos")
 data class EquipoEntity(
-    @PrimaryKey val id: Int,
+    @PrimaryKey val id: String,
     val placa: String,
     val nombre: String,
     val categoria: CategoriaEquipo,
     val estado: EstadoEquipo,
     val ubicacion: String,
-    val observaciones: String,
-    val imagenUrl: String? = null
+    val descripcion: String,
+    val imagenUrl: String? = null,
+    val instructorId: String? = null
 )

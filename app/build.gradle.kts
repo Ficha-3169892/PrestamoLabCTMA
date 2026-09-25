@@ -11,12 +11,12 @@ plugins {
 
 android {
     namespace = "com.example.prestamolabctma"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.prestamolabctma"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -97,7 +97,18 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
 
     // Coil (Imagen de evidencia)
-    implementation(libs.coil.compose)
+    implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // Supabase & Ktor
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.0.0"))
+    implementation("io.github.jan-tennert.supabase:auth-kt")
+    implementation("io.github.jan-tennert.supabase:postgrest-kt")
+    implementation("io.github.jan-tennert.supabase:storage-kt")
+    implementation("io.ktor:ktor-client-android:3.0.0")
+
+    // Koin Inyección de Dependencias
+    implementation("io.insert-koin:koin-android:3.5.3")
+    implementation("io.insert-koin:koin-androidx-compose:3.5.3")
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

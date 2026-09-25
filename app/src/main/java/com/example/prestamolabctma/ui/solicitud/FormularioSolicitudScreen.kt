@@ -16,7 +16,7 @@ import com.example.prestamolabctma.ui.viewmodel.propositoValido
 fun FormularioSolicitudScreen(
     equipo: Equipo,
     guardando: Boolean,
-    onGuardar: (Int, String, String, Int) -> Unit,
+    onGuardar: (String, String, String, Int) -> Unit,
     onCancelar: () -> Unit
 ) {
     var ambiente by remember { mutableStateOf("") }
